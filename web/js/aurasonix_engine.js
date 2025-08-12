@@ -6,6 +6,42 @@ class AuraSonixEngine {
       // Example preset structure; add real presets via the add-preset task
       // "example": { bass: "assets/audio/presets/example/bass.wav", mid: "assets/audio/presets/example/mid.wav", high: "assets/audio/presets/example/high.wav", tex: "assets/audio/presets/example/tex.wav" }
     };
+
+    // Internal state placeholders
+    this.currentPreset = null;
+  }
+
+  // Validate and set current preset; real engine should preload audio buffers
+  loadPreset(presetName) {
+    const preset = this.PRESET_CONFIG[presetName];
+    if (!preset) {
+      console.warn("AuraSonixEngine: preset not found:", presetName);
+      this.currentPreset = null;
+      return false;
+    }
+    this.currentPreset = presetName;
+    console.log("AuraSonixEngine: preset loaded:", presetName, preset);
+    return true;
+  }
+
+  playNote(noteNumber, velocity = 1.0) {
+    if (!this.currentPreset) {
+      console.warn("AuraSonixEngine: playNote ignored, no preset loaded");
+      return;
+    }
+    // TODO: Hook WebAudio graph here
+    console.log("AuraSonixEngine: playNote", { noteNumber, velocity, preset: this.currentPreset });
+  }
+
+  stopNote(noteNumber) {
+    if (!this.currentPreset) return;
+    // TODO: Stop specific note
+    console.log("AuraSonixEngine: stopNote", { noteNumber, preset: this.currentPreset });
+  }
+
+  stopAll() {
+    // TODO: Stop all voices
+    console.log("AuraSonixEngine: stopAll");
   }
 }
 window.AuraSonixEngine = AuraSonixEngine;
