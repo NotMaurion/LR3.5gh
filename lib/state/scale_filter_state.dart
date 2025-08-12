@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../audio/audio_providers.dart';
 
 class ScaleFilterState {
   final bool enabled;
@@ -39,7 +40,8 @@ class ScaleFilterState {
 }
 
 class ScaleFilterNotifier extends StateNotifier<ScaleFilterState> {
-  ScaleFilterNotifier()
+  final Ref _ref;
+  ScaleFilterNotifier(this._ref)
       : super(const ScaleFilterState(
           enabled: true,
           root: 'C',
@@ -48,16 +50,45 @@ class ScaleFilterNotifier extends StateNotifier<ScaleFilterState> {
           maxOctave: 6,
         ));
 
-  void setEnabled(bool value) => state = state.copyWith(enabled: value);
-  void setRoot(String value) => state = state.copyWith(root: value);
-  void setMode(String value) => state = state.copyWith(mode: value);
-  void setMinOctave(int value) => state = state.copyWith(minOctave: value);
-  void setMaxOctave(int value) => state = state.copyWith(maxOctave: value);
+  void _pushToEngine(ScaleFilterState s) {
+    final engine = _ref.read(audioEngineProvider);
+    engine?.updateScaleFilterConfig(s.toJson());
+  }
+
+  void setEnabled(bool value) {
+    final next = state.copyWith(enabled: value);
+    state = next;
+    _pushToEngine(next);
+  }
+
+  void setRoot(String value) {
+    final next = state.copyWith(root: value);
+    state = next;
+    _pushToEngine(next);
+  }
+
+  void setMode(String value) {
+    final next = state.copyWith(mode: value);
+    state = next;
+    _pushToEngine(next);
+  }
+
+  void setMinOctave(int value) {
+    final next = state.copyWith(minOctave: value);
+    state = next;
+    _pushToEngine(next);
+  }
+
+  void setMaxOctave(int value) {
+    final next = state.copyWith(maxOctave: value);
+    state = next;
+    _pushToEngine(next);
+  }
 }
 
 final scaleFilterProvider =
     StateNotifierProvider<ScaleFilterNotifier, ScaleFilterState>((ref) {
-  return ScaleFilterNotifier();
+  return ScaleFilterNotifier(ref);
 });
 
 

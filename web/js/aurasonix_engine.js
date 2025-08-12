@@ -79,6 +79,22 @@ class AuraSonixEngine {
     this.PRESET_KEYS = Object.keys(this.PRESET_CONFIG || {});
   }
 
+  // Update scale filter settings from Flutter
+  updateScaleFilter(newConfig) {
+    if (!this.currentPresetConfig) {
+      this.currentPresetConfig = { midiConfig: { scaleFilter: {} } };
+    }
+    if (!this.currentPresetConfig.midiConfig) {
+      this.currentPresetConfig.midiConfig = {};
+    }
+    this.currentPresetConfig.midiConfig.scaleFilter = Object.assign(
+      {},
+      this.currentPresetConfig.midiConfig.scaleFilter || {},
+      newConfig || {}
+    );
+    return true;
+  }
+
   playNote(noteNumber, velocity = 1.0) {
     if (!this.currentPreset) {
       console.warn("AuraSonixEngine: playNote ignored, no preset loaded");

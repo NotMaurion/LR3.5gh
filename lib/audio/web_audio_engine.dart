@@ -65,13 +65,7 @@ class WebAudioEngine implements AudioEngine {
   // Update scale filter configuration on JS side
   void updateScaleFilterConfig(Map<String, dynamic> config) {
     if (_engineInstance == null) return;
-    // Ensure midiConfig exists; then assign scaleFilter
-    final existing = js_util.getProperty(_engineInstance, 'midiConfig');
-    if (existing == null) {
-      js_util.setProperty(_engineInstance, 'midiConfig', {'scaleFilter': config});
-    } else {
-      js_util.setProperty(existing, 'scaleFilter', config);
-    }
+    js_util.callMethod(_engineInstance, 'updateScaleFilter', [config]);
   }
 }
 
