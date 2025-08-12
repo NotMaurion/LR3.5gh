@@ -1,16 +1,25 @@
-# liveroots
+# LiveRoots (LR3.5)
 
-A new Flutter project.
+Flutter app with MCP V4 architecture and hybrid audio engine.
+
+## Preset structure
+Assets must follow strictly:
+
+```
+assets/audio/presets/[PresetName]/
+  bass.wav
+  mid.wav
+  high.wav
+  tex.wav
+```
+
+JS config lives in `web/js/aurasonix_engine.js` under `this.PRESET_CONFIG`.
+
+## Dev flow
+- GitFlow: branches `main`, `develop`, `feature/*`.
+- Conventional Commits for messages.
 
 ## Getting Started
-
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- Flutter 3.29.x stable
+- `flutter pub get`
+- `flutter run -d chrome`
