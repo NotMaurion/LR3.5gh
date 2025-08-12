@@ -59,9 +59,78 @@ class AuraSonixEngine {
       console.warn("AuraSonixEngine: playNote ignored, no preset loaded");
       return;
     }
-    // TODO: Hook WebAudio graph here
-    console.log("AuraSonixEngine: playNote", { noteNumber, velocity, preset: this.currentPreset });
+
+    const cfg = this.currentPresetConfig;
+    const presetMap = this.PRESET_CONFIG[this.currentPreset] || {};
+
+    let selectedZone = null;
+    let sampleKey = null; // one of bass|mid|high|tex
+
+    if (cfg && Array.isArray(cfg.zones) && cfg.zones.length > 0) {
+      selectedZone = this._selectZoneForNote(cfg.zones, noteNumber);
+      if (selectedZone) {
+        // probability gate (default 1.0)
+        const prob = typeof selectedZone.probability === 'number' ? selectedZone.probability : 1.0;
+        if (!this._passProbability(prob)) {
+          console.log("AuraSonixEngine: note dropped by probability gate", { noteNumber, prob });
+          return;
+        }
+        sampleKey = this._resolveSampleKey(selectedZone.sample);
+      }
+    }
+
+    // Fallback mapping by pitch range if no zone matched
+    if (!sampleKey) {
+      if (noteNumber < 48) sampleKey = 'bass';
+      else if (noteNumber < 72) sampleKey = 'mid';
+      else if (noteNumber < 96) sampleKey = 'high';
+      else sampleKey = 'tex';
+    }
+
+    const sampleUrl = presetMap[sampleKey];
+    const globalVol = cfg && typeof cfg.globalVolume === 'number' ? cfg.globalVolume : 1.0;
+    const zoneVol = selectedZone && typeof selectedZone.volume === 'number' ? selectedZone.volume : 1.0;
+    const gain = this._clamp01(globalVol * zoneVol * this._clamp01(velocity));
+
+    // TODO: Hook WebAudio graph here with sampleUrl and gain
+    console.log("AuraSonixEngine: playNote", {
+      noteNumber,
+      velocity,
+      preset: this.currentPreset,
+      sampleKey,
+      sampleUrl,
+      gain,
+      zone: selectedZone ? selectedZone.name || sampleKey : null,
+      configLoaded: !!cfg,
+    });
   }
+
+  _selectZoneForNote(zones, noteNumber) {
+    // Select first zone where note is within [minNote, maxNote]
+    for (const z of zones) {
+      const min = typeof z.minNote === 'number' ? z.minNote : 0;
+      const max = typeof z.maxNote === 'number' ? z.maxNote : 127;
+      if (noteNumber >= min && noteNumber <= max) return z;
+    }
+    return null;
+  }
+
+  _resolveSampleKey(sampleFileName) {
+    if (!sampleFileName || typeof sampleFileName !== 'string') return null;
+    const base = sampleFileName.toLowerCase();
+    if (base.includes('bass')) return 'bass';
+    if (base.includes('mid')) return 'mid';
+    if (base.includes('high')) return 'high';
+    if (base.includes('tex')) return 'tex';
+    return null;
+  }
+
+  _passProbability(prob) {
+    const p = Number.isFinite(prob) ? Math.max(0, Math.min(1, prob)) : 1.0;
+    return Math.random() <= p;
+  }
+
+  _clamp01(v) { return Math.max(0, Math.min(1, v)); }
 
   stopNote(noteNumber) {
     if (!this.currentPreset) return;
