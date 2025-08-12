@@ -42,6 +42,37 @@ class WebAudioEngine implements AudioEngine {
     if (_engineInstance == null) return;
     js_util.callMethod(_engineInstance, 'stopAll', const []);
   }
+
+  @override
+  Future<List<String>> listPresets() async {
+    if (_engineInstance == null) {
+      await init();
+    }
+    final keys = js_util.getProperty(_engineInstance, 'PRESET_KEYS');
+    if (keys is List) {
+      return keys.cast();
+    }
+    final cfg = js_util.getProperty(_engineInstance, 'PRESET_CONFIG');
+    if (cfg != null) {
+      final object = js_util.getProperty(html.window, 'Object');
+      final arr = js_util.callMethod(object, 'keys', [cfg]);
+      if (arr is List) return arr.cast();
+    }
+    return const <String>[];
+  }
+
+  @override
+  // Update scale filter configuration on JS side
+  void updateScaleFilterConfig(Map<String, dynamic> config) {
+    if (_engineInstance == null) return;
+    // Ensure midiConfig exists; then assign scaleFilter
+    final existing = js_util.getProperty(_engineInstance, 'midiConfig');
+    if (existing == null) {
+      js_util.setProperty(_engineInstance, 'midiConfig', {'scaleFilter': config});
+    } else {
+      js_util.setProperty(existing, 'scaleFilter', config);
+    }
+  }
 }
 
 

@@ -1,18 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../state/scale_filter_state.dart';
 
-class ScaleFilterPanel extends StatefulWidget {
+class ScaleFilterPanel extends ConsumerWidget {
   const ScaleFilterPanel({super.key});
-
-  @override
-  State<ScaleFilterPanel> createState() => _ScaleFilterPanelState();
-}
-
-class _ScaleFilterPanelState extends State<ScaleFilterPanel> {
-  bool isFilterEnabled = true;
-  String selectedRoot = 'C';
-  String selectedMode = 'PENTATONIC_MAJOR';
-  double minOctave = 2;
-  double maxOctave = 6;
 
   static const List<String> noteRoots = <String>[
     'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B',
@@ -27,8 +18,11 @@ class _ScaleFilterPanelState extends State<ScaleFilterPanel> {
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final state = ref.watch(scaleFilterProvider);
+    final notifier = ref.read(scaleFilterProvider.notifier);
+    // TODO: connect to engine in next step
     return Card(
       elevation: 2,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -47,8 +41,8 @@ class _ScaleFilterPanelState extends State<ScaleFilterPanel> {
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Enable Scale Filter'),
-              value: isFilterEnabled,
-              onChanged: (value) => setState(() => isFilterEnabled = value),
+              value: state.enabled,
+              onChanged: notifier.setEnabled,
             ),
             const SizedBox(height: 8),
 
@@ -64,7 +58,7 @@ class _ScaleFilterPanelState extends State<ScaleFilterPanel> {
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
-                        value: selectedRoot,
+                        value: state.root,
                         isExpanded: true,
                         items: noteRoots
                             .map((r) => DropdownMenuItem<String>(
@@ -74,7 +68,7 @@ class _ScaleFilterPanelState extends State<ScaleFilterPanel> {
                             .toList(),
                         onChanged: (value) {
                           if (value == null) return;
-                          setState(() => selectedRoot = value);
+                          notifier.setRoot(value);
                         },
                       ),
                     ),
@@ -90,7 +84,7 @@ class _ScaleFilterPanelState extends State<ScaleFilterPanel> {
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
-                        value: selectedMode,
+                        value: state.mode,
                         isExpanded: true,
                         items: scaleModes
                             .map((m) => DropdownMenuItem<String>(
@@ -100,7 +94,7 @@ class _ScaleFilterPanelState extends State<ScaleFilterPanel> {
                             .toList(),
                         onChanged: (value) {
                           if (value == null) return;
-                          setState(() => selectedMode = value);
+                          notifier.setMode(value);
                         },
                       ),
                     ),
@@ -122,16 +116,16 @@ class _ScaleFilterPanelState extends State<ScaleFilterPanel> {
                     min: -1,
                     max: 9,
                     divisions: 10,
-                    value: minOctave.clamp(-1, maxOctave).toDouble(),
-                    label: minOctave.toStringAsFixed(0),
+                    value: state.minOctave.toDouble().clamp(-1, state.maxOctave.toDouble()),
+                    label: state.minOctave.toString(),
                     onChanged: (value) {
-                      setState(() => minOctave = value <= maxOctave ? value : maxOctave);
+                      notifier.setMinOctave(value.round());
                     },
                   ),
                 ),
                 SizedBox(
                   width: 36,
-                  child: Text(minOctave.toStringAsFixed(0)),
+                  child: Text(state.minOctave.toString()),
                 )
               ],
             ),
@@ -148,16 +142,16 @@ class _ScaleFilterPanelState extends State<ScaleFilterPanel> {
                     min: -1,
                     max: 9,
                     divisions: 10,
-                    value: maxOctave.clamp(minOctave, 9).toDouble(),
-                    label: maxOctave.toStringAsFixed(0),
+                    value: state.maxOctave.toDouble().clamp(state.minOctave.toDouble(), 9),
+                    label: state.maxOctave.toString(),
                     onChanged: (value) {
-                      setState(() => maxOctave = value >= minOctave ? value : minOctave);
+                      notifier.setMaxOctave(value.round());
                     },
                   ),
                 ),
                 SizedBox(
                   width: 36,
-                  child: Text(maxOctave.toStringAsFixed(0)),
+                  child: Text(state.maxOctave.toString()),
                 )
               ],
             ),
