@@ -17,9 +17,15 @@ class AuraSonixEngine {
     this.currentPreset = null;
     this.PRESET_KEYS = [];
     this._recomputePresetKeys();
+
+    // WebAudio primitives
+    this.audioCtx = null;
+    this.masterGain = null;
+    this.currentBuffers = { bass: null, mid: null, high: null, tex: null };
+    this.activeSources = new Set();
   }
 
-  // Validate and set current preset; real engine should preload audio buffers
+  // Validate and preload; returns false on any loading error
   async loadPreset(presetName) {
     const preset = this.PRESET_CONFIG[presetName];
     if (!preset) {
@@ -27,27 +33,46 @@ class AuraSonixEngine {
       this.currentPreset = null;
       return false;
     }
-    this.currentPreset = presetName;
-    console.log("AuraSonixEngine: preset loaded:", presetName, preset);
 
-    // Try to load advanced config.json next to wavs
-    const folder = `assets/audio/presets/${presetName}`;
-    const configUrl = `${folder}/config.json`;
+    // Reset any previous state prior to loading
+    this.currentPresetConfig = null;
+    this.currentBuffers = { bass: null, mid: null, high: null, tex: null };
+
     try {
+      // Optional config.json
+      const folder = `assets/audio/presets/${presetName}`;
+      const configUrl = `${folder}/config.json`;
       const resp = await fetch(configUrl, { cache: 'no-cache' });
-      if (resp.ok) {
+      if (resp.status === 404) {
+        this.currentPresetConfig = null;
+        console.log("AuraSonixEngine: no config.json for", presetName);
+      } else if (resp.ok) {
         this.currentPresetConfig = await resp.json();
         console.log("AuraSonixEngine: loaded config.json for", presetName, this.currentPresetConfig);
       } else {
-        this.currentPresetConfig = null;
-        console.log("AuraSonixEngine: no config.json for", presetName);
+        throw new Error(`config.json fetch failed with status ${resp.status}`);
       }
-    } catch (e) {
-      this.currentPresetConfig = null;
-      console.warn("AuraSonixEngine: error fetching config.json", e);
-    }
 
-    return true;
+      await this._ensureAudio();
+      // Load all four buffers; throws if any fail
+      const loaded = await this._loadBuffersForPreset(presetName, preset);
+      this.currentBuffers = loaded;
+
+      // Only mark preset as current after successful load
+      this.currentPreset = presetName;
+      console.log("AuraSonixEngine: preset loaded and buffers ready:", presetName);
+      return true;
+    } catch (e) {
+      console.error("AuraSonixEngine: failed to load preset", {
+        preset: presetName,
+        error: e && (e.stack || e.message || e.toString()),
+      });
+      // Ensure clean state
+      this.currentPresetConfig = null;
+      this.currentBuffers = { bass: null, mid: null, high: null, tex: null };
+      this.currentPreset = null;
+      return false;
+    }
   }
 
   _recomputePresetKeys() {
@@ -92,17 +117,25 @@ class AuraSonixEngine {
     const zoneVol = selectedZone && typeof selectedZone.volume === 'number' ? selectedZone.volume : 1.0;
     const gain = this._clamp01(globalVol * zoneVol * this._clamp01(velocity));
 
-    // TODO: Hook WebAudio graph here with sampleUrl and gain
-    console.log("AuraSonixEngine: playNote", {
-      noteNumber,
-      velocity,
-      preset: this.currentPreset,
-      sampleKey,
-      sampleUrl,
-      gain,
-      zone: selectedZone ? selectedZone.name || sampleKey : null,
-      configLoaded: !!cfg,
-    });
+    const buffer = this.currentBuffers && this.currentBuffers[sampleKey];
+    if (!this.audioCtx || !buffer) {
+      console.warn("AuraSonixEngine: buffer not ready", { sampleKey, sampleUrl });
+      return;
+    }
+
+    // Resume context on user gesture environments
+    if (this.audioCtx.state === 'suspended') {
+      this.audioCtx.resume().catch(() => {});
+    }
+
+    const src = this.audioCtx.createBufferSource();
+    src.buffer = buffer;
+    const g = this.audioCtx.createGain();
+    g.gain.value = gain;
+    src.connect(g).connect(this.masterGain);
+    src.start();
+    this.activeSources.add(src);
+    src.onended = () => this.activeSources.delete(src);
   }
 
   _selectZoneForNote(zones, noteNumber) {
@@ -139,8 +172,47 @@ class AuraSonixEngine {
   }
 
   stopAll() {
-    // TODO: Stop all voices
-    console.log("AuraSonixEngine: stopAll");
+    try {
+      for (const src of this.activeSources) {
+        try { src.stop(); } catch (_) {}
+      }
+    } finally {
+      this.activeSources.clear();
+    }
+  }
+
+  async _ensureAudio() {
+    if (!this.audioCtx) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      this.audioCtx = new Ctx();
+      this.masterGain = this.audioCtx.createGain();
+      this.masterGain.gain.value = 1.0;
+      this.masterGain.connect(this.audioCtx.destination);
+    }
+  }
+
+  async _loadBuffersForPreset(presetName, presetMap) {
+    const out = { bass: null, mid: null, high: null, tex: null };
+    const entries = Object.entries(presetMap || {});
+    for (const [key, url] of entries) {
+      if (!url) throw new Error(`Missing URL for sample key ${key}`);
+      out[key] = await this._loadAudioBuffer(url);
+      if (!out[key]) throw new Error(`Decoded buffer is null for ${key}`);
+    }
+    return out;
+  }
+
+  async _loadAudioBuffer(url) {
+    const resp = await fetch(url, { cache: 'no-cache' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status} for ${url}`);
+    const arr = await resp.arrayBuffer();
+    return await new Promise((resolve, reject) => {
+      try {
+        this.audioCtx.decodeAudioData(arr, resolve, reject);
+      } catch (e) {
+        reject(e);
+      }
+    });
   }
 }
 window.AuraSonixEngine = AuraSonixEngine;
