@@ -86,6 +86,16 @@ class AuraSonixEngine {
     }
 
     const cfg = this.currentPresetConfig;
+
+    // Scale filter (early exit)
+    const sf = cfg && cfg.midiConfig && cfg.midiConfig.scaleFilter;
+    if (sf && sf.enabled === true) {
+      const inScale = this._notePassesScaleFilter(noteNumber, sf);
+      if (!inScale) {
+        // Drop the note silently when outside the configured scale
+        return;
+      }
+    }
     const presetMap = this.PRESET_CONFIG[this.currentPreset] || {};
 
     let selectedZone = null;
@@ -164,6 +174,59 @@ class AuraSonixEngine {
   }
 
   _clamp01(v) { return Math.max(0, Math.min(1, v)); }
+
+  _notePassesScaleFilter(noteNumber, scaleFilter) {
+    const mode = (scaleFilter.scale || '').toLowerCase();
+    const root = (scaleFilter.rootNote || 'C').toUpperCase();
+    const minOct = Number.isFinite(scaleFilter.minOctave) ? scaleFilter.minOctave : -1;
+    const maxOct = Number.isFinite(scaleFilter.maxOctave) ? scaleFilter.maxOctave : 9;
+
+    const octave = this._midiOctave(noteNumber);
+    if (octave < minOct || octave > maxOct) return false;
+
+    const rootPc = this._rootToPitchClass(root);
+    const notePc = noteNumber % 12;
+
+    if (mode === 'pentatonic_major') {
+      // Intervals relative to root: 0, 2, 4, 7, 9
+      const allowed = new Set([
+        rootPc,
+        (rootPc + 2) % 12,
+        (rootPc + 4) % 12,
+        (rootPc + 7) % 12,
+        (rootPc + 9) % 12,
+      ]);
+      return allowed.has(notePc);
+    }
+
+    // If unknown scale mode, allow note (non-blocking)
+    return true;
+  }
+
+  _midiOctave(noteNumber) {
+    // MIDI note 60 -> C4 (octave = 4). MIDI 0 -> C-1
+    return Math.floor(noteNumber / 12) - 1;
+  }
+
+  _rootToPitchClass(rootNote) {
+    // Support sharps and flats
+    const map = {
+      'C': 0, 'B#': 0,
+      'C#': 1, 'DB': 1,
+      'D': 2,
+      'D#': 3, 'EB': 3,
+      'E': 4, 'FB': 4,
+      'F': 5, 'E#': 5,
+      'F#': 6, 'GB': 6,
+      'G': 7,
+      'G#': 8, 'AB': 8,
+      'A': 9,
+      'A#': 10, 'BB': 10,
+      'B': 11, 'CB': 11,
+    };
+    const key = rootNote.replace('♯', '#').replace('♭', 'B').toUpperCase();
+    return map[key] ?? 0;
+  }
 
   stopNote(noteNumber) {
     if (!this.currentPreset) return;
