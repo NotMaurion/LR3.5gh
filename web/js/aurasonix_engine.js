@@ -4,11 +4,19 @@ class AuraSonixEngine {
   constructor() {
     this.PRESET_CONFIG = {
       // Example preset structure; add real presets via the add-preset task
-      // "example": { bass: "assets/audio/presets/example/bass.wav", mid: "assets/audio/presets/example/mid.wav", high: "assets/audio/presets/example/high.wav", tex: "assets/audio/presets/example/tex.wav" }
+      // "example": { bass: "assets/audio/presets/example/bass.wav", mid: "assets/audio/presets/example/mid.wav", high: "assets/audio/presets/example/high.wav", tex: "assets/audio/presets/example/tex.wav" },
+      "Creative-Flow": {
+        bass: "assets/audio/presets/Creative-Flow/bass.wav",
+        mid: "assets/audio/presets/Creative-Flow/mid.wav",
+        high: "assets/audio/presets/Creative-Flow/high.wav",
+        tex: "assets/audio/presets/Creative-Flow/tex.wav"
+      }
     };
 
     // Internal state placeholders
     this.currentPreset = null;
+    this.PRESET_KEYS = [];
+    this._recomputePresetKeys();
   }
 
   // Validate and set current preset; real engine should preload audio buffers
@@ -22,6 +30,10 @@ class AuraSonixEngine {
     this.currentPreset = presetName;
     console.log("AuraSonixEngine: preset loaded:", presetName, preset);
     return true;
+  }
+
+  _recomputePresetKeys() {
+    this.PRESET_KEYS = Object.keys(this.PRESET_CONFIG || {});
   }
 
   playNote(noteNumber, velocity = 1.0) {
