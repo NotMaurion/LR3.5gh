@@ -20,7 +20,7 @@ class AuraSonixEngine {
   }
 
   // Validate and set current preset; real engine should preload audio buffers
-  loadPreset(presetName) {
+  async loadPreset(presetName) {
     const preset = this.PRESET_CONFIG[presetName];
     if (!preset) {
       console.warn("AuraSonixEngine: preset not found:", presetName);
@@ -29,6 +29,24 @@ class AuraSonixEngine {
     }
     this.currentPreset = presetName;
     console.log("AuraSonixEngine: preset loaded:", presetName, preset);
+
+    // Try to load advanced config.json next to wavs
+    const folder = `assets/audio/presets/${presetName}`;
+    const configUrl = `${folder}/config.json`;
+    try {
+      const resp = await fetch(configUrl, { cache: 'no-cache' });
+      if (resp.ok) {
+        this.currentPresetConfig = await resp.json();
+        console.log("AuraSonixEngine: loaded config.json for", presetName, this.currentPresetConfig);
+      } else {
+        this.currentPresetConfig = null;
+        console.log("AuraSonixEngine: no config.json for", presetName);
+      }
+    } catch (e) {
+      this.currentPresetConfig = null;
+      console.warn("AuraSonixEngine: error fetching config.json", e);
+    }
+
     return true;
   }
 
