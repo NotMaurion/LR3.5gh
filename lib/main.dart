@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'theme/app_theme.dart';
 import 'widgets/styled_preset_button.dart';
-import 'audio/engine_selector.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'audio/audio_providers.dart';
 import 'ui/lab_screen.dart';
 import 'package:flutter/services.dart';
 
@@ -23,40 +23,17 @@ class LiveRootsApp extends StatelessWidget {
   }
 }
 
-class PlayerScreen extends StatefulWidget {
+class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({super.key});
 
   @override
-  State<PlayerScreen> createState() => _PlayerScreenState();
+  ConsumerState<PlayerScreen> createState() => _PlayerScreenState();
 }
 
-class _PlayerScreenState extends State<PlayerScreen> {
+class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   bool _initializing = false;
   bool _initialized = false;
-  bool _konamiUnlocked = false;
-  final List<int> _buffer = [];
-  static const List<int> _konami = [38, 38, 40, 40, 37, 39, 37, 39, 66, 65];
-
-  void _captureKonami(RawKeyEvent e) {
-    final key = e.logicalKey;
-    int? code;
-    if (key == LogicalKeyboardKey.arrowUp) code = 38;
-    else if (key == LogicalKeyboardKey.arrowDown) code = 40;
-    else if (key == LogicalKeyboardKey.arrowLeft) code = 37;
-    else if (key == LogicalKeyboardKey.arrowRight) code = 39;
-    else if (key == LogicalKeyboardKey.keyB) code = 66;
-    else if (key == LogicalKeyboardKey.keyA) code = 65;
-    if (code == null) return;
-    _buffer.add(code);
-    if (_buffer.length > _konami.length) _buffer.removeAt(0);
-    if (_buffer.length == _konami.length) {
-      bool match = true;
-      for (int i = 0; i < _konami.length; i++) {
-        if (_buffer[i] != _konami[i]) { match = false; break; }
-      }
-      if (match) setState(() => _konamiUnlocked = true);
-    }
-  }
+  int _tapCount = 0;
 
   Future<void> _ensureInit(Object engine) async {
     if (_initialized || _initializing) return;
@@ -73,17 +50,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
     const background = Color(0xFF1A1A2E);
     const accent = Color(0xFF10D38F);
     final size = MediaQuery.of(context).size;
-    final engine = createEngine();
+    final engine = ref.watch(audioEngineProvider);
 
-    return RawKeyboardListener(
-      focusNode: FocusNode()..requestFocus(),
-      onKey: _captureKonami,
-      child: Scaffold(
+    final labUnlocked = ref.watch(isLabUnlockedProvider);
+    final tapCount = ref.watch(labTapCounterProvider);
+    return Scaffold(
       backgroundColor: background,
       appBar: AppBar(
         title: const Text(''),
         actions: [
-          if (_konamiUnlocked)
+          if (labUnlocked)
             IconButton(
               icon: const Icon(Icons.settings_outlined),
               onPressed: () {
@@ -105,10 +81,19 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 width: size.width,
                 child: Column(
                   children: [
-                    Image.asset(
-                      'assets/images/LiveRootsLogo.png',
-                      width: size.width * 0.55,
-                      fit: BoxFit.contain,
+                    GestureDetector(
+                      onTap: () {
+                        final next = tapCount + 1;
+                        ref.read(labTapCounterProvider.notifier).state = next;
+                        if (next >= 7) {
+                          ref.read(isLabUnlockedProvider.notifier).state = true;
+                        }
+                      },
+                      child: Image.asset(
+                        'assets/images/LiveRootsLogo.png',
+                        width: size.width * 0.55,
+                        fit: BoxFit.contain,
+                      ),
                     ),
                     const SizedBox(height: 24),
                   ],
@@ -155,7 +140,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           ),
         ),
       ),
-    ));
+    );
   }
 }
 

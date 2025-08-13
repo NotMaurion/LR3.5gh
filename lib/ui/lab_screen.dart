@@ -1,25 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../audio/audio_providers.dart';
+import 'lab/panels/zones_panel.dart';
 
-class LabScreen extends StatelessWidget {
+class LabScreen extends ConsumerWidget {
   const LabScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Access the global audio engine if needed
+    final _ = ref.watch(audioEngineProvider);
+    final tabs = ref.watch(labTabsProvider);
     return DefaultTabController(
-      length: 4,
+      length: tabs.length,
       child: Scaffold(
         appBar: AppBar(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           elevation: 0,
           title: const Text('Preset Laboratory'),
-          bottom: const _StyledTabBar(),
+          bottom: _StyledTabBar(tabs: tabs),
         ),
-        body: const TabBarView(
+        body: TabBarView(
           children: [
-            Center(child: Text('Zones')),
-            Center(child: Text('Scales')),
-            Center(child: Text('Audio')),
-            Center(child: Text('Rules')),
+            const ZonesPanel(),
+            const Center(child: Text('Scales')),
+            const Center(child: Text('Audio')),
+            const Center(child: Text('Rules')),
           ],
         ),
       ),
@@ -27,8 +33,9 @@ class LabScreen extends StatelessWidget {
   }
 }
 
-class _StyledTabBar extends StatelessWidget {
-  const _StyledTabBar();
+class _StyledTabBar extends StatelessWidget implements PreferredSizeWidget {
+  const _StyledTabBar({required this.tabs});
+  final List<String> tabs;
 
   @override
   Widget build(BuildContext context) {
@@ -39,14 +46,14 @@ class _StyledTabBar extends StatelessWidget {
       labelColor: accent,
       unselectedLabelColor: Colors.grey,
       indicatorWeight: 3,
-      tabs: const [
-        Tab(text: 'Zones'),
-        Tab(text: 'Scales'),
-        Tab(text: 'Audio'),
-        Tab(text: 'Rules'),
+      tabs: [
+        for (final t in tabs) Tab(text: t),
       ],
     );
   }
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 }
 
 
