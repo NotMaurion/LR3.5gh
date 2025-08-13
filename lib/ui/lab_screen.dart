@@ -5,12 +5,29 @@ class LabScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Preset Laboratory'),
-      ),
-      body: const Center(
-        child: Text('Laboratory coming soon...'),
+    return DefaultTabController(
+      length: 4,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Preset Laboratory'),
+          bottom: const TabBar(
+            isScrollable: true,
+            tabs: [
+              Tab(text: 'Zones'),
+              Tab(text: 'Scales'),
+              Tab(text: 'Audio'),
+              Tab(text: 'Rules'),
+            ],
+          ),
+        ),
+        body: const TabBarView(
+          children: [
+            Center(child: Text('Zones')),
+            Center(child: Text('Scales')),
+            Center(child: Text('Audio')),
+            Center(child: Text('Rules')),
+          ],
+        ),
       ),
     );
   }
