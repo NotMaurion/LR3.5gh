@@ -18,6 +18,17 @@
     },
     "effectsChain": [
       {
+        "id": "main-envelope",
+        "type": "Envelope",
+        "enabled": true,
+        "parameters": {
+          "attack": 0.01,
+          "decay": 0.1,
+          "sustain": 0.8,
+          "release": 0.3
+        }
+      },
+      {
         "id": "reverb-main",
         "type": "Reverb",
         "enabled": true,
