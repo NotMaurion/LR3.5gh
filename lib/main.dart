@@ -57,6 +57,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         elevation: 0,
         title: const Text(''),
         actions: [
+          if (ref.watch(isLabUnlockedProvider))
+            IconButton(
+              icon: const Icon(Icons.science),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const LabScreen()),
+                );
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
