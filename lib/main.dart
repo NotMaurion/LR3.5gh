@@ -3,6 +3,8 @@ import 'theme/app_theme.dart';
 import 'widgets/styled_preset_button.dart';
 import 'audio/engine_selector.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'ui/lab_screen.dart';
+import 'package:flutter/services.dart';
 
 void main() {
   runApp(const ProviderScope(child: LiveRootsApp()));
@@ -31,6 +33,30 @@ class PlayerScreen extends StatefulWidget {
 class _PlayerScreenState extends State<PlayerScreen> {
   bool _initializing = false;
   bool _initialized = false;
+  bool _konamiUnlocked = false;
+  final List<int> _buffer = [];
+  static const List<int> _konami = [38, 38, 40, 40, 37, 39, 37, 39, 66, 65];
+
+  void _captureKonami(RawKeyEvent e) {
+    final key = e.logicalKey;
+    int? code;
+    if (key == LogicalKeyboardKey.arrowUp) code = 38;
+    else if (key == LogicalKeyboardKey.arrowDown) code = 40;
+    else if (key == LogicalKeyboardKey.arrowLeft) code = 37;
+    else if (key == LogicalKeyboardKey.arrowRight) code = 39;
+    else if (key == LogicalKeyboardKey.keyB) code = 66;
+    else if (key == LogicalKeyboardKey.keyA) code = 65;
+    if (code == null) return;
+    _buffer.add(code);
+    if (_buffer.length > _konami.length) _buffer.removeAt(0);
+    if (_buffer.length == _konami.length) {
+      bool match = true;
+      for (int i = 0; i < _konami.length; i++) {
+        if (_buffer[i] != _konami[i]) { match = false; break; }
+      }
+      if (match) setState(() => _konamiUnlocked = true);
+    }
+  }
 
   Future<void> _ensureInit(Object engine) async {
     if (_initialized || _initializing) return;
@@ -49,8 +75,25 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final size = MediaQuery.of(context).size;
     final engine = createEngine();
 
-    return Scaffold(
+    return RawKeyboardListener(
+      focusNode: FocusNode()..requestFocus(),
+      onKey: _captureKonami,
+      child: Scaffold(
       backgroundColor: background,
+      appBar: AppBar(
+        title: const Text(''),
+        actions: [
+          if (_konamiUnlocked)
+            IconButton(
+              icon: const Icon(Icons.settings_outlined),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const LabScreen()),
+                );
+              },
+            ),
+        ],
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
@@ -112,7 +155,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           ),
         ),
       ),
-    );
+    ));
   }
 }
 
