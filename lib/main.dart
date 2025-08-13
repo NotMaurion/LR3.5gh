@@ -4,7 +4,7 @@ import 'widgets/styled_preset_button.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'audio/audio_providers.dart';
 import 'ui/lab_screen.dart';
-import 'package:flutter/services.dart';
+import 'ui/settings_screen.dart';
 
 void main() {
   runApp(const ProviderScope(child: LiveRootsApp()));
@@ -33,7 +33,6 @@ class PlayerScreen extends ConsumerStatefulWidget {
 class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   bool _initializing = false;
   bool _initialized = false;
-  int _tapCount = 0;
 
   Future<void> _ensureInit(Object engine) async {
     if (_initialized || _initializing) return;
@@ -51,23 +50,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     const accent = Color(0xFF10D38F);
     final size = MediaQuery.of(context).size;
     final engine = ref.watch(audioEngineProvider);
-
-    final labUnlocked = ref.watch(isLabUnlockedProvider);
-    final tapCount = ref.watch(labTapCounterProvider);
     return Scaffold(
       backgroundColor: background,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         title: const Text(''),
         actions: [
-          if (labUnlocked)
-            IconButton(
-              icon: const Icon(Icons.settings_outlined),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const LabScreen()),
-                );
-              },
-            ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              );
+            },
+          ),
         ],
       ),
       body: SafeArea(
@@ -81,19 +78,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                 width: size.width,
                 child: Column(
                   children: [
-                    GestureDetector(
-                      onTap: () {
-                        final next = tapCount + 1;
-                        ref.read(labTapCounterProvider.notifier).state = next;
-                        if (next >= 7) {
-                          ref.read(isLabUnlockedProvider.notifier).state = true;
-                        }
-                      },
-                      child: Image.asset(
-                        'assets/images/LiveRootsLogo.png',
-                        width: size.width * 0.55,
-                        fit: BoxFit.contain,
-                      ),
+                    Image.asset(
+                      'assets/images/LiveRootsLogo.png',
+                      width: size.width * 0.55,
+                      fit: BoxFit.contain,
                     ),
                     const SizedBox(height: 24),
                   ],
