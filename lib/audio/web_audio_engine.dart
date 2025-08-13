@@ -46,7 +46,33 @@ class WebAudioEngine implements AudioEngine {
   @override
   void updateScaleFilterConfig(Map<String, dynamic> config) {
     if (_engineInstance == null) return;
-    js_util.callMethod(_engineInstance, 'updateScaleFilter', [config]);
+    try {
+      js_util.callMethod(_engineInstance, 'updateScaleFilter', [config]);
+    } catch (_) {}
+  }
+
+  @override
+  void updateZonesConfig(List<Map<String, dynamic>> zones) {
+    if (_engineInstance == null) return;
+    try {
+      js_util.callMethod(_engineInstance, 'updateZonesConfig', [zones]);
+    } catch (_) {}
+  }
+
+  @override
+  Future<List<String>> listPresets() async {
+    if (_engineInstance == null) {
+      await init();
+    }
+    try {
+      final keys = js_util.getProperty(_engineInstance, 'PRESET_KEYS');
+      if (keys is List) {
+        return keys.map((e) => e.toString()).toList();
+      }
+    } catch (_) {
+      // ignore and fall through
+    }
+    return const <String>[];
   }
 
   @override

@@ -7,6 +7,9 @@ abstract class AudioEngine {
   void playNote(int noteNumber, {double velocity = 1.0});
   void stopNote(int noteNumber);
   void stopAll();
+  Future<List<String>> listPresets();
+  void updateScaleFilterConfig(Map<String, dynamic> config);
+  void updateZonesConfig(List<Map<String, dynamic>> zones);
   Future<void> play();
 }
 
