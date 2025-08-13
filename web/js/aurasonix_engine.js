@@ -23,6 +23,7 @@ class AuraSonixEngine {
     this.masterGain = null;
     this.currentBuffers = { bass: null, mid: null, high: null, tex: null };
     this.activeSources = new Set();
+    this.activeByNote = {}; // noteNumber -> Set<AudioBufferSourceNode>
   }
 
   // Validate and preload; returns false on any loading error
@@ -79,6 +80,22 @@ class AuraSonixEngine {
     this.PRESET_KEYS = Object.keys(this.PRESET_CONFIG || {});
   }
 
+  // Update scale filter settings from Flutter
+  updateScaleFilter(newConfig) {
+    if (!this.currentPresetConfig) {
+      this.currentPresetConfig = { midiConfig: { scaleFilter: {} } };
+    }
+    if (!this.currentPresetConfig.midiConfig) {
+      this.currentPresetConfig.midiConfig = {};
+    }
+    this.currentPresetConfig.midiConfig.scaleFilter = Object.assign(
+      {},
+      this.currentPresetConfig.midiConfig.scaleFilter || {},
+      newConfig || {}
+    );
+    return true;
+  }
+
   playNote(noteNumber, velocity = 1.0) {
     if (!this.currentPreset) {
       console.warn("AuraSonixEngine: playNote ignored, no preset loaded");
@@ -131,11 +148,32 @@ class AuraSonixEngine {
     const src = this.audioCtx.createBufferSource();
     src.buffer = buffer;
     const g = this.audioCtx.createGain();
-    g.gain.value = gain;
+    // Envelope parameters (seconds) from config, with sensible defaults
+    const env = this._getEnvelope();
+    // Start at near zero then A->D towards sustain
+    const now = this.audioCtx.currentTime;
+    const peak = Math.max(0, gain);
+    const sustainLevel = Math.max(0, Math.min(1, env.sustain ?? 0.8));
+    g.gain.cancelScheduledValues(now);
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.linearRampToValueAtTime(peak, now + (env.attack ?? 0.01));
+    g.gain.linearRampToValueAtTime(peak * sustainLevel, now + (env.attack ?? 0.01) + (env.decay ?? 0.1));
+
     src.connect(g).connect(this.masterGain);
     src.start();
     this.activeSources.add(src);
-    src.onended = () => this.activeSources.delete(src);
+    // Track by note for precise stop
+    if (!this.activeByNote[noteNumber]) this.activeByNote[noteNumber] = new Set();
+    src._gainNode = g; // attach for release handling
+    this.activeByNote[noteNumber].add(src);
+    src.onended = () => {
+      this.activeSources.delete(src);
+      const set = this.activeByNote[noteNumber];
+      if (set) {
+        set.delete(src);
+        if (set.size === 0) delete this.activeByNote[noteNumber];
+      }
+    };
   }
 
   _selectZoneForNote(zones, noteNumber) {
@@ -166,9 +204,24 @@ class AuraSonixEngine {
   _clamp01(v) { return Math.max(0, Math.min(1, v)); }
 
   stopNote(noteNumber) {
-    if (!this.currentPreset) return;
-    // TODO: Stop specific note
-    console.log("AuraSonixEngine: stopNote", { noteNumber, preset: this.currentPreset });
+    const set = this.activeByNote[noteNumber];
+    if (!set || set.size === 0) return;
+    const env = this._getEnvelope();
+    const rel = Math.max(0.0, env.release ?? 0.3);
+    const now = this.audioCtx.currentTime;
+    for (const src of Array.from(set)) {
+      try {
+        const g = src._gainNode;
+        if (g) {
+          g.gain.cancelScheduledValues(now);
+          const current = g.gain.value;
+          g.gain.setValueAtTime(current, now);
+          g.gain.linearRampToValueAtTime(0.0001, now + rel);
+        }
+        src.stop(now + rel + 0.01);
+      } catch (_) {}
+    }
+    delete this.activeByNote[noteNumber];
   }
 
   stopAll() {
@@ -179,6 +232,63 @@ class AuraSonixEngine {
     } finally {
       this.activeSources.clear();
     }
+  }
+
+  enableMidi() {
+    if (!navigator.requestMIDIAccess) {
+      console.warn('AuraSonixEngine: Web MIDI API not supported');
+      return false;
+    }
+    const onMessage = (event) => {
+      const [status, data1, data2] = event.data;
+      const command = status & 0xf0;
+      // Note On
+      if (command === 0x90 && data2 > 0) {
+        const note = data1;
+        const velocity = Math.max(0.0, Math.min(1.0, data2 / 127));
+        this.playNote(note, velocity);
+        return;
+      }
+      // Note Off (or Note On with velocity 0)
+      if (command === 0x80 || (command === 0x90 && data2 === 0)) {
+        const note = data1;
+        this.stopNote(note);
+      }
+    };
+
+    const attachInputs = (access) => {
+      for (const input of access.inputs.values()) {
+        input.onmidimessage = onMessage;
+      }
+      access.onstatechange = () => {
+        for (const input of access.inputs.values()) {
+          input.onmidimessage = onMessage;
+        }
+      };
+    };
+
+    navigator.requestMIDIAccess({ sysex: false })
+      .then((access) => {
+        attachInputs(access);
+        console.log('AuraSonixEngine: MIDI enabled');
+      })
+      .catch((e) => {
+        console.warn('AuraSonixEngine: MIDI failed', e);
+      });
+    return true;
+  }
+
+  _getEnvelope() {
+    const cfg = this.currentPresetConfig;
+    const chain = cfg && Array.isArray(cfg.effectsChain) ? cfg.effectsChain : [];
+    const env = chain.find((e) => (e && (e.type === 'Envelope' || e.id === 'main-envelope')));
+    const params = (env && env.parameters) || {};
+    return {
+      attack: Number(params.attack ?? 0.01),
+      decay: Number(params.decay ?? 0.1),
+      sustain: Number(params.sustain ?? 0.8),
+      release: Number(params.release ?? 0.3),
+    };
   }
 
   async _ensureAudio() {
