@@ -42,6 +42,22 @@ class WebAudioEngine implements AudioEngine {
     if (_engineInstance == null) return;
     js_util.callMethod(_engineInstance, 'stopAll', const []);
   }
+
+  @override
+  void updateScaleFilterConfig(Map<String, dynamic> config) {
+    if (_engineInstance == null) return;
+    js_util.callMethod(_engineInstance, 'updateScaleFilter', [config]);
+  }
+
+  @override
+  Future<void> play() async {
+    if (_engineInstance == null) {
+      await init();
+    }
+    try {
+      js_util.callMethod(_engineInstance, 'enableMidi', const []);
+    } catch (_) {}
+  }
 }
 
 

@@ -1,0 +1,42 @@
+{
+    "version": 1,
+    "presetName": "Creative-Flow",
+    "description": "Un preset diseñado para inspirar la creatividad con un toque etéreo.",
+    "globalVolume": 0.9,
+    "layerVolumes": {
+      "bass": 0.85,
+      "mid": 0.75,
+      "high": 0.8,
+      "tex": 1.0
+    },
+    "midiConfig": {
+      "scaleFilter": {
+        "enabled": true,
+        "scale": "pentatonic_major",
+        "rootNote": "C"
+      }
+    },
+    "effectsChain": [
+      {
+        "id": "reverb-main",
+        "type": "Reverb",
+        "enabled": true,
+        "parameters": {
+          "wet": 0.3,
+          "roomSize": 0.7,
+          "damping": 0.5
+        }
+      },
+      {
+        "id": "delay-pingpong",
+        "type": "Delay",
+        "enabled": false,
+        "parameters": {
+          "time": "4n",
+          "feedback": 0.4,
+          "wet": 0.25
+        }
+      }
+    ]
+  }
+  

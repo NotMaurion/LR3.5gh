@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'theme/app_theme.dart';
+import 'widgets/styled_preset_button.dart';
+import 'audio/engine_selector.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 void main() {
-  runApp(const LiveRootsApp());
+  runApp(const ProviderScope(child: LiveRootsApp()));
 }
 
 class LiveRootsApp extends StatelessWidget {
@@ -11,19 +15,39 @@ class LiveRootsApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      theme: AppTheme.theme,
       home: const PlayerScreen(),
     );
   }
 }
 
-class PlayerScreen extends StatelessWidget {
+class PlayerScreen extends StatefulWidget {
   const PlayerScreen({super.key});
+
+  @override
+  State<PlayerScreen> createState() => _PlayerScreenState();
+}
+
+class _PlayerScreenState extends State<PlayerScreen> {
+  bool _initializing = false;
+  bool _initialized = false;
+
+  Future<void> _ensureInit(Object engine) async {
+    if (_initialized || _initializing) return;
+    setState(() => _initializing = true);
+    await (engine as dynamic).init();
+    setState(() {
+      _initializing = false;
+      _initialized = true;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     const background = Color(0xFF1A1A2E);
     const accent = Color(0xFF10D38F);
     final size = MediaQuery.of(context).size;
+    final engine = createEngine();
 
     return Scaffold(
       backgroundColor: background,
@@ -39,7 +63,7 @@ class PlayerScreen extends StatelessWidget {
                 child: Column(
                   children: [
                     Image.asset(
-                      'images/Logo Live Roots Lab blanco fondo transparente-01.png',
+                      'assets/images/LiveRootsLogo.png',
                       width: size.width * 0.55,
                       fit: BoxFit.contain,
                     ),
@@ -48,26 +72,40 @@ class PlayerScreen extends StatelessWidget {
                 ),
               ),
 
-              // Preset buttons
-              _PresetButton(text: 'Creative Flow', active: true, glowColor: accent),
-              const SizedBox(height: 12),
-              const _PresetButton(text: 'Deep Focus'),
-              const SizedBox(height: 12),
-              const _PresetButton(text: 'Relaxation'),
-              const SizedBox(height: 12),
-              const _PresetButton(text: 'Night Drive'),
+              if (_initializing)
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CircularProgressIndicator(),
+                ),
+              _PresetList(
+                presets: const ['Creative-Flow', 'Deep-Focus', 'Relaxation', 'Night-Drive'],
+                engine: engine,
+                onAnyPress: () => _ensureInit(engine),
+              ),
 
               SizedBox(height: size.height * 0.12),
 
-              // Bottom controls
+              // Bottom controls (Play enables MIDI listener; Stop stops all)
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  _CircleControl(icon: Icons.timer_outlined),
-                  SizedBox(width: 32),
-                  _CircleControl(icon: Icons.play_arrow_rounded, primary: true),
-                  SizedBox(width: 32),
-                  _CircleControl(icon: Icons.stop_rounded),
+                children: [
+                  const _CircleControl(icon: Icons.timer_outlined),
+                  const SizedBox(width: 32),
+                  GestureDetector(
+                    onTap: () async {
+                      await _ensureInit(engine);
+                      await (engine as dynamic).play();
+                    },
+                    child: const _CircleControl(icon: Icons.play_arrow_rounded, primary: true),
+                  ),
+                  const SizedBox(width: 32),
+                  GestureDetector(
+                    onTap: () async {
+                      await _ensureInit(engine);
+                      (engine as dynamic).stopAll();
+                    },
+                    child: const _CircleControl(icon: Icons.stop_rounded),
+                  ),
                 ],
               ),
             ],
@@ -78,53 +116,37 @@ class PlayerScreen extends StatelessWidget {
   }
 }
 
-class _PresetButton extends StatelessWidget {
-  const _PresetButton({required this.text, this.active = false, this.glowColor});
-  final String text;
-  final bool active;
-  final Color? glowColor;
+class _PresetList extends StatefulWidget {
+  const _PresetList({required this.presets, required this.engine, required this.onAnyPress});
+  final List<String> presets;
+  final Object engine;
+  final Future<void> Function() onAnyPress;
+
+  @override
+  State<_PresetList> createState() => _PresetListState();
+}
+
+class _PresetListState extends State<_PresetList> {
+  String? _active;
 
   @override
   Widget build(BuildContext context) {
-    final baseColor = Colors.white.withOpacity(0.08);
-    final borderColor = active ? (glowColor ?? const Color(0xFF10D38F)) : Colors.white24;
-    final shadow = active
-        ? [
-            BoxShadow(
-              color: (glowColor ?? const Color(0xFF10D38F)).withOpacity(0.45),
-              blurRadius: 24,
-              spreadRadius: 1,
-            )
-          ]
-        : [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.25),
-              blurRadius: 16,
-            )
-          ];
-
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: baseColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor, width: 1.5),
-        boxShadow: shadow,
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-      child: Row(
-        children: [
-          Icon(Icons.graphic_eq_rounded, color: Colors.white.withOpacity(0.9)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
-            ),
+    return Column(
+      children: [
+        for (final p in widget.presets) ...[
+          StyledPresetButton(
+            label: p.replaceAll('-', ' '),
+            isActive: _active == p,
+            onPressed: () async {
+              await widget.onAnyPress();
+              // ignore: avoid_dynamic_calls
+              final ok = await (widget.engine as dynamic).loadPreset(p) as bool;
+              if (ok) setState(() => _active = p);
+            },
           ),
-          Icon(Icons.chevron_right_rounded, color: Colors.white.withOpacity(0.9)),
-        ],
-      ),
+          const SizedBox(height: 12),
+        ]
+      ],
     );
   }
 }

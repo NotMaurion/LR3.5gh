@@ -7,6 +7,7 @@ abstract class AudioEngine {
   void playNote(int noteNumber, {double velocity = 1.0});
   void stopNote(int noteNumber);
   void stopAll();
+  Future<void> play();
 }
 
 
