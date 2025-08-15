@@ -1,11 +1,25 @@
 import 'package:flutter/material.dart';
 import 'theme/app_theme.dart';
 import 'widgets/styled_preset_button.dart';
-import 'audio/engine_selector.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'audio/audio_providers.dart';
+import 'ui/lab_screen.dart';
+import 'ui/settings_screen.dart';
+import 'services/storage_service.dart';
 
-void main() {
-  runApp(const ProviderScope(child: LiveRootsApp()));
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize storage service
+  final storageService = StorageService();
+  await storageService.initialize();
+  
+  runApp(ProviderScope(
+    overrides: [
+      storageServiceProvider.overrideWithValue(storageService),
+    ],
+    child: const LiveRootsApp(),
+  ));
 }
 
 class LiveRootsApp extends StatelessWidget {
@@ -21,14 +35,14 @@ class LiveRootsApp extends StatelessWidget {
   }
 }
 
-class PlayerScreen extends StatefulWidget {
+class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({super.key});
 
   @override
-  State<PlayerScreen> createState() => _PlayerScreenState();
+  ConsumerState<PlayerScreen> createState() => _PlayerScreenState();
 }
 
-class _PlayerScreenState extends State<PlayerScreen> {
+class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   bool _initializing = false;
   bool _initialized = false;
 
@@ -47,10 +61,33 @@ class _PlayerScreenState extends State<PlayerScreen> {
     const background = Color(0xFF1A1A2E);
     const accent = Color(0xFF10D38F);
     final size = MediaQuery.of(context).size;
-    final engine = createEngine();
-
+    final engine = ref.watch(audioEngineProvider);
     return Scaffold(
       backgroundColor: background,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text(''),
+        actions: [
+          if (ref.watch(isLabUnlockedProvider))
+            IconButton(
+              icon: const Icon(Icons.science),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const LabScreen()),
+                );
+              },
+            ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              );
+            },
+          ),
+        ],
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),

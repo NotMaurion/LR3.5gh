@@ -96,6 +96,30 @@ class AuraSonixEngine {
     return true;
   }
 
+  // Update zones configuration from Flutter
+  updateZonesConfig(zones) {
+    if (!this.currentPresetConfig) this.currentPresetConfig = {};
+    const sanitize = (z) => {
+      const out = Object.assign({}, z || {});
+      const clamp01 = (v) => Math.max(0, Math.min(1, Number(v)));
+      out.minNote = Math.max(0, Math.min(127, Number(out.minNote ?? 0)));
+      out.maxNote = Math.max(0, Math.min(127, Number(out.maxNote ?? 127)));
+      if (out.maxNote < out.minNote) {
+        const tmp = out.minNote; out.minNote = out.maxNote; out.maxNote = tmp;
+      }
+      out.baseNote = (out.baseNote || 'C').toString();
+      out.volume = clamp01(out.volume ?? 1.0);
+      out.probability = clamp01(out.probability ?? 1.0);
+      return out;
+    };
+    if (Array.isArray(zones)) {
+      this.currentPresetConfig.zones = zones.map(sanitize);
+    } else {
+      this.currentPresetConfig.zones = [];
+    }
+    return true;
+  }
+
   playNote(noteNumber, velocity = 1.0) {
     if (!this.currentPreset) {
       console.warn("AuraSonixEngine: playNote ignored, no preset loaded");

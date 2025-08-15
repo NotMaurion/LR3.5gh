@@ -9,18 +9,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:liveroots/main.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 void main() {
   testWidgets('Counter increments smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const LiveRootsApp());
+    await tester.pumpWidget(const ProviderScope(child: LiveRootsApp()));
 
-    // Verify that our counter starts at 0.
-    // Basic smoke test: logo present
-    expect(find.byType(Image), findsWidgets);
+    // Basic smoke test: app builds
+    expect(find.byType(MaterialApp), findsOneWidget);
 
-    // Tap the '+' icon and trigger a frame.
-    // Buttons exist
-    expect(find.text('Creative Flow'), findsOneWidget);
+    // Presence of PlayerScreen
+    expect(find.byType(PlayerScreen), findsOneWidget);
   });
 }

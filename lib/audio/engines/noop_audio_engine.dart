@@ -23,6 +23,9 @@ class NoopAudioEngine implements AudioEngine {
   void updateScaleFilterConfig(Map<String, dynamic> config) {}
 
   @override
+  void updateZonesConfig(List<Map<String, dynamic>> zones) {}
+
+  @override
   Future<void> play() async {}
 }
 
