@@ -1,8 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../audio/audio_providers.dart';
 
 class ZoneConfig {
-  ZoneConfig({
+  final String name;
+  final double minNote;
+  final double maxNote;
+  final String baseNote;
+  final double volume;
+  final double probability;
+
+  const ZoneConfig({
     required this.name,
     required this.minNote,
     required this.maxNote,
@@ -11,17 +17,10 @@ class ZoneConfig {
     required this.probability,
   });
 
-  final String name;
-  final int minNote;
-  final int maxNote;
-  final String baseNote;
-  final double volume;
-  final double probability;
-
   ZoneConfig copyWith({
     String? name,
-    int? minNote,
-    int? maxNote,
+    double? minNote,
+    double? maxNote,
     String? baseNote,
     double? volume,
     double? probability,
@@ -36,73 +35,116 @@ class ZoneConfig {
     );
   }
 
-  Map<String, dynamic> toJson() => <String, dynamic>{
-        'name': name,
-        'minNote': minNote,
-        'maxNote': maxNote,
-        'baseNote': baseNote,
-        'volume': volume,
-        'probability': probability,
-      };
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'minNote': minNote,
+      'maxNote': maxNote,
+      'baseNote': baseNote,
+      'volume': volume,
+      'probability': probability,
+    };
+  }
 }
 
 class ZonesNotifier extends StateNotifier<List<ZoneConfig>> {
-  ZonesNotifier(this._ref)
-      : super(<ZoneConfig>[
-          ZoneConfig(name: 'Bass', minNote: 24, maxNote: 47, baseNote: 'C', volume: 0.85, probability: 1.0),
-          ZoneConfig(name: 'Mid', minNote: 48, maxNote: 71, baseNote: 'C', volume: 0.85, probability: 1.0),
-          ZoneConfig(name: 'High', minNote: 72, maxNote: 95, baseNote: 'C', volume: 0.85, probability: 1.0),
-          ZoneConfig(name: 'Tex', minNote: 0, maxNote: 127, baseNote: 'C', volume: 0.5, probability: 0.5),
-        ]);
+  ZonesNotifier() : super(_defaultZones);
 
-  final Ref _ref;
+  static const List<ZoneConfig> _defaultZones = [
+    ZoneConfig(
+      name: 'Bass',
+      minNote: 0.0,
+      maxNote: 47.0,
+      baseNote: 'C',
+      volume: 0.7,
+      probability: 0.8,
+    ),
+    ZoneConfig(
+      name: 'Mid',
+      minNote: 48.0,
+      maxNote: 83.0,
+      baseNote: 'C',
+      volume: 0.6,
+      probability: 0.7,
+    ),
+    ZoneConfig(
+      name: 'High',
+      minNote: 84.0,
+      maxNote: 107.0,
+      baseNote: 'C',
+      volume: 0.5,
+      probability: 0.6,
+    ),
+    ZoneConfig(
+      name: 'Tex',
+      minNote: 108.0,
+      maxNote: 127.0,
+      baseNote: 'C',
+      volume: 0.4,
+      probability: 0.5,
+    ),
+  ];
 
-  void _pushToEngine() {
-    final engine = _ref.read(audioEngineProvider);
-    try {
-      // ignore: avoid_dynamic_calls
-      (engine as dynamic).updateZonesConfig(state.map((z) => z.toJson()).toList());
-    } catch (_) {}
+  void updateZone(int index, ZoneConfig updatedZone) {
+    if (index >= 0 && index < state.length) {
+      state = [
+        ...state.sublist(0, index),
+        updatedZone,
+        ...state.sublist(index + 1),
+      ];
+    }
   }
 
-  void _updateAt(int index, ZoneConfig Function(ZoneConfig) transform) {
-    final list = List<ZoneConfig>.from(state);
-    list[index] = transform(list[index]);
-    state = list;
-    _pushToEngine();
+  void setMinNote(int index, double minNote) {
+    if (index >= 0 && index < state.length) {
+      final zone = state[index];
+      final updatedZone = zone.copyWith(
+        minNote: minNote,
+        maxNote: minNote > zone.maxNote ? minNote : zone.maxNote,
+      );
+      updateZone(index, updatedZone);
+    }
   }
 
-  void setMin(int index, int value) {
-    _updateAt(index, (z) {
-      final v = value.clamp(0, 127);
-      final newMin = v <= z.maxNote ? v : z.maxNote;
-      return z.copyWith(minNote: newMin);
-    });
+  void setMaxNote(int index, double maxNote) {
+    if (index >= 0 && index < state.length) {
+      final zone = state[index];
+      final updatedZone = zone.copyWith(
+        maxNote: maxNote,
+        minNote: maxNote < zone.minNote ? maxNote : zone.minNote,
+      );
+      updateZone(index, updatedZone);
+    }
   }
 
-  void setMax(int index, int value) {
-    _updateAt(index, (z) {
-      final v = value.clamp(0, 127);
-      final newMax = v >= z.minNote ? v : z.minNote;
-      return z.copyWith(maxNote: newMax);
-    });
+  void setBaseNote(int index, String baseNote) {
+    if (index >= 0 && index < state.length) {
+      final zone = state[index];
+      final updatedZone = zone.copyWith(baseNote: baseNote);
+      updateZone(index, updatedZone);
+    }
   }
 
-  void setBase(int index, String value) {
-    _updateAt(index, (z) => z.copyWith(baseNote: value));
+  void setVolume(int index, double volume) {
+    if (index >= 0 && index < state.length) {
+      final zone = state[index];
+      final updatedZone = zone.copyWith(volume: volume);
+      updateZone(index, updatedZone);
+    }
   }
 
-  void setVolume(int index, double value) {
-    _updateAt(index, (z) => z.copyWith(volume: value.clamp(0.0, 1.0)));
-  }
-
-  void setProbability(int index, double value) {
-    _updateAt(index, (z) => z.copyWith(probability: value.clamp(0.0, 1.0)));
+  void setProbability(int index, double probability) {
+    if (index >= 0 && index < state.length) {
+      final zone = state[index];
+      final updatedZone = zone.copyWith(probability: probability);
+      updateZone(index, updatedZone);
+    }
   }
 }
 
-final zonesProvider = StateNotifierProvider<ZonesNotifier, List<ZoneConfig>>(
-  (ref) => ZonesNotifier(ref),
-);
+// Provider global para el estado de las zonas
+final zonesProvider = StateNotifierProvider<ZonesNotifier, List<ZoneConfig>>((ref) {
+  return ZonesNotifier();
+});
 
 
