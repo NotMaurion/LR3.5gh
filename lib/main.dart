@@ -5,9 +5,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'audio/audio_providers.dart';
 import 'ui/lab_screen.dart';
 import 'ui/settings_screen.dart';
+import 'services/storage_service.dart';
 
-void main() {
-  runApp(const ProviderScope(child: LiveRootsApp()));
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize storage service
+  final storageService = StorageService();
+  await storageService.initialize();
+  
+  runApp(ProviderScope(
+    overrides: [
+      storageServiceProvider.overrideWithValue(storageService),
+    ],
+    child: const LiveRootsApp(),
+  ));
 }
 
 class LiveRootsApp extends StatelessWidget {

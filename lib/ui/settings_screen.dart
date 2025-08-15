@@ -31,7 +31,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (_konamiSequence[_konamiIndex] == input) {
       setLocalState(() => _konamiIndex += 1);
       if (_konamiIndex >= _konamiSequence.length) {
-        ref.read(isLabUnlockedProvider.notifier).state = true;
+        ref.read(isLabUnlockedProvider.notifier).unlock();
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Lab unlocked!')),
