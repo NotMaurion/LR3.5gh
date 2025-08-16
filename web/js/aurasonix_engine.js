@@ -175,10 +175,11 @@ class AuraSonixEngine {
 
     // Fallback mapping by pitch range if no zone matched
     if (!sampleKey) {
-      if (noteNumber < 48) sampleKey = 'bass';
-      else if (noteNumber < 72) sampleKey = 'mid';
-      else if (noteNumber < 96) sampleKey = 'high';
+      if (noteNumber >= 21 && noteNumber <= 43) sampleKey = 'bass';
+      else if (noteNumber >= 44 && noteNumber <= 67) sampleKey = 'mid';
+      else if (noteNumber >= 68 && noteNumber <= 87) sampleKey = 'high';
       else sampleKey = 'tex';
+      console.log("AuraSonixEngine: fallback mapping used", { noteNumber, sampleKey });
     }
 
     const sampleUrl = presetMap[sampleKey];
@@ -205,17 +206,22 @@ class AuraSonixEngine {
       playbackRate = Math.pow(2, semitoneDifference / 12);
       console.log("AuraSonixEngine: pitch shifting applied", {
         noteNumber,
+        noteName: this._getNoteName(noteNumber),
         zoneName: selectedZone.name,
         zoneBaseNote: selectedZone.baseNote,
         zoneBaseNoteValue: zoneBaseNote,
+        zoneBaseNoteName: this._getNoteName(zoneBaseNote),
         semitoneDifference,
-        playbackRate: playbackRate.toFixed(4)
+        playbackRate: playbackRate.toFixed(4),
+        sampleKey
       });
     } else {
       console.log("AuraSonixEngine: no pitch shifting - no zone or baseNote", {
         noteNumber,
+        noteName: this._getNoteName(noteNumber),
         selectedZone: selectedZone ? selectedZone.name : null,
-        hasBaseNote: selectedZone ? !!selectedZone.baseNote : false
+        hasBaseNote: selectedZone ? !!selectedZone.baseNote : false,
+        sampleKey
       });
     }
 
@@ -482,6 +488,13 @@ class AuraSonixEngine {
       'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11
     };
     return noteValues[rootNote] || 0;
+  }
+
+  _getNoteName(noteNumber) {
+    const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const octave = Math.floor(noteNumber / 12) - 1;
+    const noteInOctave = noteNumber % 12;
+    return `${noteNames[noteInOctave]}${octave}`;
   }
 }
 window.AuraSonixEngine = AuraSonixEngine;
