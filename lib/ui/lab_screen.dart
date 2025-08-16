@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../audio/audio_providers.dart';
 import 'lab/panels/zones_panel.dart';
+import 'lab/panels/scales_panel.dart';
 
 class LabScreen extends ConsumerWidget {
   const LabScreen({super.key});
@@ -23,7 +24,7 @@ class LabScreen extends ConsumerWidget {
         body: TabBarView(
           children: [
             const ZonesPanel(),
-            const Center(child: Text('Scales')),
+            const ScalesPanel(),
             const Center(child: Text('Audio')),
             const Center(child: Text('Rules')),
           ],

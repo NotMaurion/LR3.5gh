@@ -129,6 +129,14 @@ class AuraSonixEngine {
     const cfg = this.currentPresetConfig;
     const presetMap = this.PRESET_CONFIG[this.currentPreset] || {};
 
+    // Apply scale filter if enabled
+    if (cfg && cfg.midiConfig && cfg.midiConfig.scaleFilter && cfg.midiConfig.scaleFilter.enabled) {
+      if (!this._notePassesScaleFilter(noteNumber, cfg.midiConfig.scaleFilter)) {
+        console.log("AuraSonixEngine: note dropped by scale filter", { noteNumber });
+        return;
+      }
+    }
+
     let selectedZone = null;
     let sampleKey = null; // one of bass|mid|high|tex
 
@@ -347,6 +355,50 @@ class AuraSonixEngine {
         reject(e);
       }
     });
+  }
+
+  _notePassesScaleFilter(noteNumber, scaleFilter) {
+    const octave = Math.floor(noteNumber / 12) - 1;
+    if (octave < scaleFilter.minOctave || octave > scaleFilter.maxOctave) {
+      return false;
+    }
+    
+    const noteInOctave = noteNumber % 12;
+    const rootNote = this._getRootNoteValue(scaleFilter.rootNote);
+    const relativeNote = (noteInOctave - rootNote + 12) % 12;
+    
+    switch (scaleFilter.scale) {
+      case 'chromatic':
+        return true;
+      case 'pentatonic_major':
+        return [0, 2, 4, 7, 9].includes(relativeNote);
+      case 'pentatonic_minor':
+        return [0, 3, 5, 7, 10].includes(relativeNote);
+      case 'major':
+        return [0, 2, 4, 5, 7, 9, 11].includes(relativeNote);
+      case 'minor':
+        return [0, 2, 3, 5, 7, 8, 10].includes(relativeNote);
+      case 'dorian':
+        return [0, 2, 3, 5, 7, 9, 10].includes(relativeNote);
+      case 'mixolydian':
+        return [0, 2, 4, 5, 7, 9, 10].includes(relativeNote);
+      case 'lydian':
+        return [0, 2, 4, 6, 7, 9, 11].includes(relativeNote);
+      case 'phrygian':
+        return [0, 1, 3, 5, 7, 8, 10].includes(relativeNote);
+      case 'locrian':
+        return [0, 1, 3, 5, 6, 8, 10].includes(relativeNote);
+      default:
+        return true;
+    }
+  }
+
+  _getRootNoteValue(rootNote) {
+    const noteValues = {
+      'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5,
+      'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11
+    };
+    return noteValues[rootNote] || 0;
   }
 }
 window.AuraSonixEngine = AuraSonixEngine;
