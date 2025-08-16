@@ -196,8 +196,24 @@ class AuraSonixEngine {
       this.audioCtx.resume().catch(() => {});
     }
 
+    // Calculate pitch shifting based on zone's base note
+    let playbackRate = 1.0;
+    if (selectedZone && selectedZone.baseNote) {
+      const zoneBaseNote = this._getRootNoteValue(selectedZone.baseNote);
+      const semitoneDifference = noteNumber - zoneBaseNote;
+      playbackRate = Math.pow(2, semitoneDifference / 12);
+      console.log("AuraSonixEngine: pitch shifting applied", {
+        noteNumber,
+        zoneBaseNote: selectedZone.baseNote,
+        zoneBaseNoteValue: zoneBaseNote,
+        semitoneDifference,
+        playbackRate
+      });
+    }
+
     const src = this.audioCtx.createBufferSource();
     src.buffer = buffer;
+    src.playbackRate.value = playbackRate;
     const g = this.audioCtx.createGain();
     // Envelope parameters (seconds) from config, with sensible defaults
     const env = this._getEnvelope();
