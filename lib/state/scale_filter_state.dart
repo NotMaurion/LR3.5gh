@@ -42,9 +42,9 @@ class ScaleFilterState {
 class ScaleFilterNotifier extends StateNotifier<ScaleFilterState> {
   ScaleFilterNotifier(this._ref)
       : super(const ScaleFilterState(
-          enabled: true,
+          enabled: false,
           root: 'C',
-          mode: 'PENTATONIC_MAJOR',
+          mode: 'CHROMATIC',
           minOctave: 2,
           maxOctave: 6,
         ));
