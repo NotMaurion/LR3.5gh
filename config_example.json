@@ -1,0 +1,95 @@
+{
+    "version": 2,
+    "presetName": "Creative-Flow",
+    "description": "Un preset diseñado para inspirar la creatividad con un toque etéreo y respuesta dinámica.",
+    "globalVolume": 0.9,
+    "midiConfig": {
+      "scaleFilter": {
+        "enabled": true,
+        "scale": "pentatonic_major",
+        "rootNote": "C",
+        "minOctave": 2,
+        "maxOctave": 6
+      },
+      "processingRules": {
+        "velocityCurve": "natural",
+        "notePriority": "latest",
+        "polyphonyLimit": 16,
+        "retriggerMode": "allow"
+      }
+    },
+    "zones": [
+      {
+        "name": "Bass Zone",
+        "sample": "bass.wav",
+        "minNote": 24,
+        "maxNote": 47,
+        "baseNote": 36,
+        "volume": 0.85,
+        "probability": 1.0
+      },
+      {
+        "name": "Mid Zone",
+        "sample": "mid.wav",
+        "minNote": 48,
+        "maxNote": 71,
+        "baseNote": 60,
+        "volume": 0.75,
+        "probability": 1.0
+      },
+      {
+        "name": "High Zone",
+        "sample": "high.wav",
+        "minNote": 72,
+        "maxNote": 95,
+        "baseNote": 84,
+        "volume": 0.8,
+        "probability": 1.0
+      },
+      {
+        "name": "Texture Zone",
+        "sample": "tex.wav",
+        "minNote": 0,
+        "maxNote": 127,
+        "baseNote": 60,
+        "volume": 1.0,
+        "probability": 0.5
+      }
+    ],
+    "effectsChain": [
+      {
+        "id": "reverb-main",
+        "type": "Reverb",
+        "enabled": true,
+        "parameters": {
+          "wet": 0.3,
+          "roomSize": 0.7,
+          "damping": 0.5
+        }
+      },
+      {
+        "id": "lfo-filter-mod",
+        "type": "LFO",
+        "enabled": true,
+        "parameters": {
+          "target": "filter.frequency",
+          "ampRate": 0.1,
+          "ampDepth": 0.2,
+          "filterRate": 0.05,
+          "filterDepth": 500
+        }
+      },
+      {
+        "id": "main-envelope",
+        "type": "Envelope",
+        "enabled": true,
+        "parameters": {
+          "attack": 0.01,
+          "decay": 0.1,
+          "sustain": 0.9,
+          "release": 0.5
+        }
+      }
+    ]
+  }
+  

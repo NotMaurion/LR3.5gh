@@ -1,316 +1,142 @@
-MCP V3: Live Roots AuraSonix Engine
-Nombre del Protocolo: VibeFlow (v3.3)
-Proyecto: AuraSonix Engine - Un intérprete MIDI generativo con un motor de audio multicapa, efectos y presets para Flutter.
-Filosofía: "Vibe Coding". Priorizar el desarrollo de funcionalidades complejas y la experiencia de usuario, delegando la documentación, las pruebas y las tareas repetitivas a la IA y a la automatización.
+Plan de Control Maestro (MCP) V4.1: LiveRoots - Arquitectura Definitiva
+Versión: 4.1
+Fecha: 12 de agosto de 2024
+Filosofía: "Fundación Estable, Creatividad Ilimitada". Priorizamos una arquitectura central robusta, predecible y fácil de mantener para eliminar la deuda técnica. Sobre esta base sólida, construimos las funcionalidades creativas y complejas de forma segura y escalable.
 
-1. Visión General del Proyecto (Actualizada según Arquitectura Implementada)
+1. Resumen Ejecutivo: ¿Por Qué Este Nuevo MCP?
+El desarrollo anterior (V3) enfrentó problemas críticos de estabilidad, principalmente por:
 
-Aplicación: Una aplicación Flutter multiplataforma (Web, iOS, Android) que funciona como un instrumento musical generativo con capacidades avanzadas de procesamiento MIDI y audio.
+Complejidad Accidental: El uso de archivos .json para la gestión de presets introdujo una capa frágil de parseo y validación, propensa a errores.
 
-Motor de Audio: El núcleo de la app utiliza una arquitectura híbrida:
-- **Web Platform**: Web Audio API con JavaScript (`web_audio.js`) para baja latencia y efectos avanzados
-- **Mobile Platforms**: flutter_soloud como motor principal con fallback a audioplayers
-- **Unified Interface**: Abstracción común a través de `WebUtils` y `WebAudioApi`
+Ambigüedad en Rutas: La falta de una convención estricta para las rutas de los archivos de audio generó errores 404 y dificultó la depuración.
 
-Arquitectura de Interfaz (Implementada y Funcional):
-- **FOLDER Central**: `assets/audio/presets/` - Repositorio central de presets con estructura estandarizada
-- **Main Window**: Interfaz simple y fácil de usar para cargar presets con scrollable UI y toggle buttons
-- **Lab Window**: Máquina completa y afinable para crear y modificar presets con tabs funcionales (Effects tab removido, consolidado en Advanced MIDI Config)
+Acoplamiento Excesivo: La lógica de audio estaba demasiado mezclada con la lógica de la aplicación, haciendo difícil aislar y solucionar problemas.
 
-Flujo de Datos Implementado:
-```
-Main Window ← FOLDER → Lab Window
-    ↓           ↑         ↓
-  LOAD      assets/    EDIT EXISTING
-           audio/      AND CREATE
-          presets/     VOLUME CONTROLS
-                      REAL-TIME EFFECTS
-```
+Este MCP V4.1 resuelve estos problemas de raíz con una arquitectura simplificada y un flujo de trabajo profesional, permitiendo que el equipo se concentre en crear funcionalidades en lugar de apagar incendios.
 
-2. Stack Tecnológico (Actualizado según Implementación)
+2. Arquitectura de Software: "Convención sobre Configuración"
+Abandonamos los archivos .json para la carga de presets y adoptamos una estructura de directorios estricta como única fuente de verdad.
 
+2.1. Estructura de Presets (No Negociable)
+assets/
+└── audio/
+    └── presets/
+        ├── [nombre_del_preset_1]/
+        │   ├── bass.wav
+        │   ├── mid.wav
+        │   ├── high.wav
+        │   └── tex.wav
+        └── [nombre_del_preset_2]/
+            ├── bass.wav
+            ...
+
+Regla de Oro: Cada subdirectorio en presets/ es un preset. Su nombre es el nombre del preset. Debe contener los cuatro archivos .wav nombrados exactamente como se muestra.
+
+Beneficio: Cero errores de parseo, cero ambigüedad. El sistema es predecible.
+
+2.2. Motor de Audio Híbrido y Aislado
+Se define una interfaz común en Dart (AudioEngine) para desacoplar la UI de la implementación de audio de cada plataforma.
+
+Interfaz Común (lib/audio/audio_engine.dart):
+
+abstract class AudioEngine {
+  Future<void> init();
+  Future<bool> loadPreset(String presetName);
+  void playNote(int noteNumber, {double velocity});
+  void stopNote(int noteNumber);
+  void stopAll();
+  // Futuro: Métodos para controlar efectos
+  // void setEffectParam(String effectId, String param, double value);
+}
+
+Implementación Web (WebAudioEngine): Un puente en Dart que invoca al AuraSonixEngine, un motor de audio autocontenido en JavaScript (web/js/aurasonix_engine.js). La complejidad de la Web Audio API vive aislada del código Flutter.
+
+Implementación Móvil (MobileAudioEngine): Usará un paquete robusto como just_audio para implementar la misma interfaz AudioEngine, consumiendo los mismos archivos de assets.
+
+2.3. Entidades del Dominio (Simplificadas y Futuras)
+Las complejas entidades del V3 (LFO, EffectsChain, etc.) no se eliminan, sino que se reubican. Pasan de ser un problema de "parseo de JSON" a ser una responsabilidad interna del AudioEngine.
+
+En la Fase Inicial: El motor solo se preocupa de cargar y reproducir los 4 samples.
+
+En Fases Futuras (Laboratorio): El AudioEngine se expandirá internamente para manejar estas entidades. Por ejemplo, al cargar un preset del "Lab", podría buscar un lab_preset_config.json opcional dentro de la carpeta del preset para configurar efectos, LFOs, etc. Esto se hará sobre una base que ya es estable.
+
+3. Stack Tecnológico
 Framework: Flutter (última versión estable)
-Lenguaje: Dart (última versión estable)
-Gestión de Estado: Riverpod con riverpod_generator (implementado completamente)
-Procesamiento MIDI: 
-- Web MIDI API para navegadores
-- dart_midi para parseo y procesamiento
-- AdvancedMidiProcessor para lógica compleja
 
-Reproducción de Audio (Arquitectura Híbrida Implementada):
-- **Web Platform**: Web Audio API con JavaScript (`web_audio.js`) - Baja latencia, efectos avanzados, routing multicapa
-- **Mobile Platforms**: flutter_soloud como motor principal
-- **Fallback**: audioplayers para compatibilidad
-- **Unified Interface**: `WebUtils` y `WebAudioApi` proporcionan abstracción común
+Gestión de Estado: Riverpod con riverpod_generator.
 
-Base de Datos Local: Isar para almacenar Presets, configuraciones de usuario y metadatos de contenido.
+Motor de Audio Web: AuraSonixEngine (JavaScript nativo con Web Audio API).
 
-3. Arquitectura de Software (Implementada y Funcional)
+Motor de Audio Móvil: just_audio.
 
-Clean Architecture implementada con las siguientes entidades refinadas:
+Base de Datos Local: Isar. Se usará únicamente para configuraciones de usuario y presets creados en el "Laboratorio", no para la carga de presets base.
 
-Domain (Dominio)
-Entidades Principales Implementadas:
-- **MidiNote**: Representa una nota MIDI (noteNumber, velocity)
-- **SoundSample**: Contiene la ruta a un archivo de audio y su nota base
-- **TriggerCondition**: Clase abstracta que define cuándo se activa una capa
-- **SoundLayer**: Define una capa de sonido con triggerConditions y effectsChain
-- **AmbientLayer**: Representa un sonido de fondo con modulación LFO
-- **AudioEffect**: Clase abstracta (ReverbEffect, FilterEffect, DelayEffect)
-- **EffectsChain**: Una lista ordenada de AudioEffect
-- **AudioPreset**: La entidad clave que agrupa toda una configuración
-- **LFO**: Define un Oscilador de Baja Frecuencia (shape, rate, depth)
-- **ModulationMapping**: Conecta un LFO a un parámetro específico
-- **AdvancedMidiConfig**: Configuración avanzada con scale filtering y multi-zone mapping
-- **ScaleFilterConfig**: Filtrado por escala y rango de octavas
-- **LayerVolumes**: Control individual de volúmenes por capa
+CI/CD & Hosting: GitHub Actions y Firebase Hosting.
 
-Casos de Uso Implementados:
-- **ProcessMidiEvent**: Recibe un MidiNote, evalúa las triggerConditions y activa las capas correspondientes
-- **ApplyPreset**: Carga un Preset y configura todo el motor de audio
-- **AdvancedMidiProcessor**: Procesamiento avanzado con scale filtering y multi-zone mapping
-- **Real-time Volume Control**: Control de volúmenes en tiempo real con actualización inmediata del audio
+4. Flujo de Trabajo y DevOps
+Para garantizar la calidad y la velocidad, adoptamos un flujo de trabajo profesional.
 
-Flujo de Procesamiento de Audio Implementado:
-1. MIDI Note → AdvancedMidiProcessor → Scale Filtering
-2. Triggered Layers → Individual Effects Chains
-3. Mixed Output → Global Effects Chain
-4. Real-time Volume Control → Immediate Audio Update
+4.1. Estrategia Git (GitFlow)
+main: Rama de producción. Estable y siempre desplegable.
 
-4. Estrategia de Contenido Híbrida (Implementada)
+develop: Rama de integración. Aquí se fusionan las nuevas funcionalidades.
 
-Fase 1: Contenido Inicial Incluido (Bundled Content) ✅
-- Implementado: 3 presets completos (relaxation, deep focus, creative flow)
-- Estructura: `assets/audio/presets/[preset_name]/` con archivos bass, high, mid, tex y preset.json
-- Funcionalidad: Carga automática y funcionamiento inmediato
+feature/[nombre]: Ramas para cada nueva funcionalidad.
 
-Fase 2: Contenido Descargable (Biblioteca de Presets) 🔄
-- Preparado: Sistema de importación ZIP implementado
-- UI: Botón de importación en Main Window
-- Backend: Preparado para integración con Firebase Storage
+Commits Convencionales: Todos los commits deben seguir el estándar tipo(alcance): mensaje (ej. feat(audio): add reverb effect). Esto automatiza la generación de changelogs.
 
-Fase 3: Contenido del Usuario (Modo Laboratorio) ✅
-- Implementado: Lab Screen con capacidades completas de edición
-- File Picker: Integrado para cargar samples personalizados
-- Real-time Editing: Modificación en tiempo real de presets
+4.2. Automatización (GitHub Actions)
+CI (Integración Continua): En cada push a develop o main, se ejecutarán automáticamente:
 
-5. Acceso Oculto a la UI de Laboratorio (Easter Egg) ✅
+flutter analyze (Análisis estático de código).
 
-Activación Implementada:
-- Tocar el logo de la app 7 veces en la pantalla de Ajustes
-- Logo actualizado: "Logo-App-Live-Roots-Lab.png" en lugar de Flutter logo
-- Overlay con D-pad y botones A/B para código Konami
-- Código: ↑↑↓↓←→←→BA
-- Desbloqueo: Guarda isLabUnlocked = true en Isar
-- UI Condicional: Botón "Laboratorio" aparece permanentemente
+flutter test (Pruebas unitarias).
 
-6. Especificaciones de Interfaz (Implementadas y Funcionales)
+flutter build web (Para asegurar que el proyecto compila).
 
-Main Window ✅:
-- **Propósito**: "A simple App where the presets are loaded. It should be easy to use."
-- **Funcionalidad**: Carga presets desde `assets/audio/presets/` con nombres de carpetas
-- **UI Mejorada**: 
-  - Logo actualizado con "Logo Live Roots Lab blanco fondo transparente-01.png"
-  - Logo ampliado (240x240) sin ClipOval para usar todo el espacio disponible
-  - Scrollable ListView para múltiples presets
-  - Toggle buttons con green glow effect para preset activo
-  - Texto blanco para presets activos con outline verde
-  - Eliminación del "mode status button" y "LIVE ROOTS" text del AppBar
-  - Nombres de carpetas como display names
-  - "Creative Flow" como preset por defecto (primero en la lista)
-  - Browser tab title: "LiveRoots Player"
-  - **Favicon personalizado**: LiveRoots Lab logo en lugar de Flutter icon
-- **Play/Stop Controls**: 
-  - Play button: Habilita entrada MIDI y reproduce ambient sound
-  - Stop button: Deshabilita MIDI y fade out de 4 segundos
-  - Tab visibility handling: Manejo automático de cambios de tab
-- **Experiencia**: Interfaz simple y fácil de usar
+CD (Despliegue Continuo): En cada push a main, el workflow desplegará automáticamente la versión web a Firebase Hosting.
 
-Lab Window ✅:
-- **Propósito**: "A complete Midi Lab for creating and fine tuning existing sounds."
-- **Funcionalidad**: Crear y afinar sonidos existentes con tabs funcionales
-- **Tabs Implementados**:
-  - **Advanced MIDI Config**: Configuración avanzada de MIDI (único tab activo)
-  - **Removido**: Effects Editor tab (funcionalidad consolidada en Advanced MIDI Config)
-  - **Removido**: Basic Settings tab (consolidado en Advanced MIDI Config)
-  - **Removido**: Audio Files tab (consolidado en Advanced MIDI Config)
-- **Capacidad**: Cargar desde ZIP conteniendo sonidos y JSON con presets
-- **Real-time Controls**: Volúmenes y efectos se aplican inmediatamente
-- **Experiencia**: Máquina completa y afinable para usuarios avanzados
+5. Hoja de Ruta (Roadmap)
+Esta hoja de ruta prioriza la estabilidad antes de añadir complejidad.
 
-7. Características Técnicas Implementadas
+Fase 1: Fundación Estable (Completa)
 
-Audio Engine & Playback Controls ✅:
-- **Web Audio API**: Motor principal con baja latencia y efectos avanzados
-- **Audio Loading**: Prioriza archivos .mp3 con fallback a .wav
-- **AudioContext Management**: Manejo automático de suspensión/resumen
-- **Play/Stop System**: 
-  - Play: Habilita entrada MIDI y reproduce ambient sound
-  - Stop: Deshabilita MIDI y fade out de 4 segundos
-  - Tab Visibility: Manejo automático de cambios de tab/window
-- **Audio Decoding**: Manejo robusto de errores de decodificación MP3/WAV
-- **Cache Busting**: Sistema agresivo para evitar problemas de caché
+[x] Definir y construir el motor AuraSonixEngine en JS.
 
-Volumen Controls ✅:
-- **Master Volume**: Control global del volumen
-- **Layer Volumes**: Control individual para Bass, Mid, High, Ambient
-- **Real-time Updates**: Cambios aplicados inmediatamente al audio
-- **Safe Values**: Fallbacks para valores iniciales (0.8 para master/layers, 0.6 para ambient)
-- **Reset/Randomize**: Botones funcionales para ajustes rápidos
+[x] Crear página de pruebas HTML para validación aislada.
 
-MIDI Processing ✅:
-- **Web MIDI API**: Soporte completo para navegadores
-- **Scale Filtering**: Filtrado por escala y rango de octavas (Chromatic implementado)
-- **Multi-zone Mapping**: Mapeo avanzado de zonas MIDI
-- **Real-time Processing**: Procesamiento en tiempo real de eventos MIDI
-- **Advanced Configuration**: Configuración avanzada con estadísticas y debugging
-- **MIDI State Management**: 
-  - Ignora señales MIDI cuando app está en "stop"
-  - Re-enable automático cuando se presiona "play"
-  - Manejo de visibilidad de tab para entrada MIDI
+[x] Establecer la estructura de archivos "Convención sobre Configuración".
 
-Audio Effects ✅:
-- **Reverb**: Room size, damping, wet/dry levels
-- **Filter**: Lowpass, highpass, frequency, resonance
-- **LFO**: Sine, square, triangle waves con rate y depth
-- **Envelope**: ADSR parameters para modulación
-- **Real-time Application**: Efectos aplicados inmediatamente
+Fase 2: Integración y App Base
 
-8. Estándares, Git y CI/CD
+[ ] Implementar la interfaz AudioEngine y las clases WebAudioEngine y MobileAudioEngine.
 
-Estándares de Código Implementados:
-- **Clean Architecture**: Implementada completamente
-- **Riverpod**: Gestión de estado con providers generados
-- **Error Handling**: Manejo robusto de errores con logging
-- **Type Safety**: Uso completo de tipos de Dart
-- **Code Generation**: build_runner para providers y entidades
+[ ] Construir la UI del "Reproductor Simple" en Flutter, consumiendo el AudioEngine.
 
-Estrategia de Git:
-- **Feature Branches**: Desarrollo en ramas separadas
-- **Conventional Commits**: Estructura de commits estandarizada
-- **Pull Requests**: Revisión de código antes de merge
-- **Versioning**: Semantic versioning para releases
+[ ] Configurar CI/CD en GitHub Actions.
 
-CI/CD (Preparado):
-- **GitHub Actions**: Workflows para testing y deployment
-- **Automated Testing**: Unit tests y integration tests
-- **Code Quality**: Linting y análisis estático
-- **Deployment**: Automatización para web y mobile
+Fase 3: El Laboratorio - Creación
 
-9. Estrategia de Testing (Implementada)
+[ ] Diseñar e implementar la UI del "Laboratorio".
 
-Unit Tests Implementados:
-- **Preset Loading**: Verificación de carga correcta de presets
-- **MIDI Processing**: Testing de procesamiento de eventos MIDI
-- **Volume Controls**: Verificación de controles de volumen
-- **Effects Application**: Testing de aplicación de efectos
-- **Provider States**: Verificación de estados de Riverpod providers
+[ ] Permitir al usuario cargar sus propios samples.
 
-Integration Tests (con patrol):
-- **Easter Egg Flow**: Navegación a Ajustes, tocar logo 7 veces, código Konami
-- **Lab Access**: Verificación de desbloqueo del Laboratorio
-- **Preset Loading**: Flujo completo de carga de presets
-- **Volume Controls**: Testing de controles de volumen en tiempo real
-- **MIDI Connection**: Verificación de conexión MIDI y procesamiento
+[ ] Guardar los presets del laboratorio (samples + configuración de efectos) usando Isar.
 
-10. Estado Actual del Proyecto ✅
+Fase 4: Motor de Efectos Avanzado
 
-Funcionalidades Completadas:
-- ✅ Main Window con UI mejorada y scrollable
-- ✅ Lab Window con tabs funcionales (Effects tab removido)
-- ✅ Real-time volume controls
-- ✅ MIDI processing avanzado
-- ✅ Audio effects en tiempo real
-- ✅ Easter egg para acceso al Lab
-- ✅ Preset loading y management
-- ✅ Web Audio API integration
-- ✅ Advanced MIDI configuration
-- ✅ Scale filtering y multi-zone mapping
-- ✅ Play/Stop controls con fade out de 4 segundos
-- ✅ Tab visibility handling para MIDI input
-- ✅ AudioContext management automático
-- ✅ UI refinements (logo, presets, colors)
-- ✅ Chromatic scale filtering en todos los presets
-- ✅ **Favicon personalizado implementado y desplegado**
-- ✅ **Lab screen simplificado con solo Advanced MIDI Config tab**
+[ ] Expandir el AudioEngine para que soporte una cadena de efectos (Reverb, Filter, Delay).
 
-Funcionalidades en Desarrollo:
-- 🔄 Content download system (Fase 2)
-- 🔄 Advanced DSP effects
-- 🔄 User preset sharing
-- 🔄 Cloud sync capabilities
+[ ] Implementar la modulación con LFOs y Envelopes (ADSR) dentro del motor.
 
-11. Próximos Pasos
+[ ] Conectar la UI del Laboratorio para controlar estos parámetros en tiempo real.
 
-Corto Plazo:
-- Testing exhaustivo de play/stop controls y tab visibility
-- Optimización de performance en Web Audio API
-- Mejora de la UI/UX basada en feedback de usuario
-- Implementación de más efectos de audio
-- Testing exhaustivo de todas las funcionalidades
+Fase 5: Contenido y Comunidad
 
-Mediano Plazo:
-- Sistema de descarga de contenido (Fase 2)
-- Integración con servicios en la nube
-- Mejoras en el motor de audio para mobile
-- Sistema de sharing de presets
+[ ] Implementar la descarga de nuevos presets desde un backend (Firebase Storage).
 
-Largo Plazo:
-- DSP personalizado con FFI
-- Integración con DAWs
-- Machine learning para generación de presets
-- Comunidad de usuarios y marketplace
+[ ] Desarrollar un sistema para compartir presets entre usuarios.
 
-12. Mejoras Recientes (Agosto 2024) ✅
+Fase 6: Acceso Oculto (Easter Egg)
 
-UI/UX Refinements:
-- Logo actualizado con imagen transparente y tamaño ampliado
-- Preset buttons con green glow effect y texto blanco
-- Eliminación de elementos innecesarios (star icon, "LIVE ROOTS" text)
-- "Creative Flow" como preset por defecto
-- Browser tab title actualizado a "LiveRoots Player"
-- **Favicon personalizado**: LiveRoots Lab logo implementado y desplegado
-- **Lab screen simplificado**: Solo Advanced MIDI Config tab activo
-
-Audio Engine Improvements:
-- Play/Stop controls con fade out de 4 segundos
-- AudioContext management automático para tab visibility
-- Priorización de archivos .mp3 con fallback a .wav
-- Manejo robusto de errores de decodificación
-- Cache busting agresivo para evitar problemas de caché
-
-MIDI State Management:
-- Ignora señales MIDI cuando app está en "stop"
-- Re-enable automático cuando se presiona "play"
-- Manejo de visibilidad de tab para entrada MIDI
-- Chromatic scale filtering implementado en todos los presets
-
-Deployment & Infrastructure:
-- **Firebase hosting configurado y funcional**
-- **Favicon personalizado desplegado exitosamente**
-- **Build process optimizado con cache-busting**
-- **Multiple favicon formats soportados (PNG, ICO)**
-
-13. Notas de Implementación
-
-Arquitectura Híbrida:
-- Web: Web Audio API proporciona la mejor performance y flexibilidad
-- Mobile: flutter_soloud como base con capacidad de expansión
-- Unified Interface: Abstracción común permite desarrollo consistente
-
-Real-time Processing:
-- MIDI events procesados inmediatamente
-- Volume changes aplicados sin delay
-- Effects modificados en tiempo real
-- Audio routing optimizado para baja latencia
-- Play/Stop state management con fade controls
-- Tab visibility handling para continuidad de audio
-
-User Experience:
-- Main Window simple y intuitivo con controles play/stop
-- Lab Window potente pero accesible (simplificado a un tab)
-- Easter egg mantiene la simplicidad inicial
-- Feedback inmediato en todas las interacciones
-- UI refinada con logo actualizado y presets mejorados
-- Manejo automático de cambios de tab para continuidad
-- **Favicon personalizado mejora la identidad de marca**
+[ ] Implementar el desbloqueo del Laboratorio mediante el código Konami como se especificó en V3, usando Isar para guardar el estado de desbloqueo.
