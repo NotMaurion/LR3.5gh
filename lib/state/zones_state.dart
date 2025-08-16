@@ -56,33 +56,33 @@ class ZonesNotifier extends StateNotifier<List<ZoneConfig>> {
   static const List<ZoneConfig> _defaultZones = [
     ZoneConfig(
       name: 'Bass',
-      minNote: 0.0,
-      maxNote: 47.0,
+      minNote: 21.0,  // A0 (nota más baja del piano)
+      maxNote: 43.0,  // G2
       baseNote: 'C',
       volume: 0.7,
       probability: 0.8,
     ),
     ZoneConfig(
       name: 'Mid',
-      minNote: 48.0,
-      maxNote: 83.0,
-      baseNote: 'E',
+      minNote: 44.0,  // G#2
+      maxNote: 67.0,  // G4
+      baseNote: 'C',
       volume: 0.6,
       probability: 0.7,
     ),
     ZoneConfig(
       name: 'High',
-      minNote: 84.0,
-      maxNote: 107.0,
-      baseNote: 'G',
+      minNote: 68.0,  // G#4
+      maxNote: 87.0,  // C6 (nota más alta del piano)
+      baseNote: 'C',
       volume: 0.5,
       probability: 0.6,
     ),
     ZoneConfig(
       name: 'Tex',
-      minNote: 108.0,
-      maxNote: 127.0,
-      baseNote: 'A',
+      minNote: 21.0,  // A0 (rango completo para textura)
+      maxNote: 87.0,  // C6
+      baseNote: 'C',
       volume: 0.4,
       probability: 0.5,
     ),
