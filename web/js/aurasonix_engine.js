@@ -225,6 +225,12 @@ class AuraSonixEngine {
       });
     }
 
+    // Debug logs for pitch shifting
+    console.log("MIDI Note In:", noteNumber);
+    console.log("Selected Zone:", selectedZone ? selectedZone.name : "none");
+    console.log("Base Note for Zone:", selectedZone ? selectedZone.baseNote : "none");
+    console.log("Calculated Playback Rate:", playbackRate);
+
     const src = this.audioCtx.createBufferSource();
     src.buffer = buffer;
     src.playbackRate.value = playbackRate;
