@@ -114,6 +114,15 @@ class AuraSonixEngine {
     };
     if (Array.isArray(zones)) {
       this.currentPresetConfig.zones = zones.map(sanitize);
+      console.log("AuraSonixEngine: zones config updated", {
+        zonesCount: zones.length,
+        zones: this.currentPresetConfig.zones.map(z => ({
+          name: z.name,
+          range: `${z.minNote}-${z.maxNote}`,
+          volume: z.volume,
+          probability: z.probability
+        }))
+      });
     } else {
       this.currentPresetConfig.zones = [];
     }
@@ -149,7 +158,9 @@ class AuraSonixEngine {
           console.log("AuraSonixEngine: note dropped by probability gate", { noteNumber, prob });
           return;
         }
-        sampleKey = this._resolveSampleKey(selectedZone.sample);
+        // Map zone name to sample key
+        sampleKey = this._mapZoneNameToSample(selectedZone.name);
+        console.log("AuraSonixEngine: zone selected", { noteNumber, zoneName: selectedZone.name, sampleKey, volume: selectedZone.volume, probability: selectedZone.probability });
       }
     }
 
@@ -225,6 +236,16 @@ class AuraSonixEngine {
     if (base.includes('mid')) return 'mid';
     if (base.includes('high')) return 'high';
     if (base.includes('tex')) return 'tex';
+    return null;
+  }
+
+  _mapZoneNameToSample(zoneName) {
+    if (!zoneName || typeof zoneName !== 'string') return null;
+    const name = zoneName.toLowerCase();
+    if (name === 'bass') return 'bass';
+    if (name === 'mid') return 'mid';
+    if (name === 'high') return 'high';
+    if (name === 'tex') return 'tex';
     return null;
   }
 

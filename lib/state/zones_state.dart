@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../audio/audio_providers.dart';
 
 class ZoneConfig {
   final String name;
@@ -48,7 +49,9 @@ class ZoneConfig {
 }
 
 class ZonesNotifier extends StateNotifier<List<ZoneConfig>> {
-  ZonesNotifier() : super(_defaultZones);
+  ZonesNotifier(this._ref) : super(_defaultZones);
+
+  final Ref _ref;
 
   static const List<ZoneConfig> _defaultZones = [
     ZoneConfig(
@@ -92,6 +95,17 @@ class ZonesNotifier extends StateNotifier<List<ZoneConfig>> {
         updatedZone,
         ...state.sublist(index + 1),
       ];
+      _pushToEngine();
+    }
+  }
+
+  void _pushToEngine() {
+    try {
+      final engine = _ref.read(audioEngineProvider);
+      final zonesData = state.map((zone) => zone.toMap()).toList();
+      (engine as dynamic).updateZonesConfig(zonesData);
+    } catch (e) {
+      print('ZonesNotifier: failed to push to engine: $e');
     }
   }
 
