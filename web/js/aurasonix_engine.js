@@ -93,6 +93,14 @@ class AuraSonixEngine {
       this.currentPresetConfig.midiConfig.scaleFilter || {},
       newConfig || {}
     );
+    console.log("AuraSonixEngine: scale filter updated", {
+      newConfig,
+      currentFilter: this.currentPresetConfig.midiConfig.scaleFilter,
+      enabled: this.currentPresetConfig.midiConfig.scaleFilter.enabled,
+      rootNote: this.currentPresetConfig.midiConfig.scaleFilter.rootNote,
+      scale: this.currentPresetConfig.midiConfig.scaleFilter.scale,
+      octaveRange: `${this.currentPresetConfig.midiConfig.scaleFilter.minOctave}-${this.currentPresetConfig.midiConfig.scaleFilter.maxOctave}`
+    });
     return true;
   }
 
@@ -381,6 +389,12 @@ class AuraSonixEngine {
   _notePassesScaleFilter(noteNumber, scaleFilter) {
     const octave = Math.floor(noteNumber / 12) - 1;
     if (octave < scaleFilter.minOctave || octave > scaleFilter.maxOctave) {
+      console.log("AuraSonixEngine: note dropped by octave range", { 
+        noteNumber, 
+        octave, 
+        minOctave: scaleFilter.minOctave, 
+        maxOctave: scaleFilter.maxOctave 
+      });
       return false;
     }
     
@@ -388,30 +402,54 @@ class AuraSonixEngine {
     const rootNote = this._getRootNoteValue(scaleFilter.rootNote);
     const relativeNote = (noteInOctave - rootNote + 12) % 12;
     
+    let passes = false;
     switch (scaleFilter.scale) {
       case 'chromatic':
-        return true;
+        passes = true;
+        break;
       case 'pentatonic_major':
-        return [0, 2, 4, 7, 9].includes(relativeNote);
+        passes = [0, 2, 4, 7, 9].includes(relativeNote);
+        break;
       case 'pentatonic_minor':
-        return [0, 3, 5, 7, 10].includes(relativeNote);
+        passes = [0, 3, 5, 7, 10].includes(relativeNote);
+        break;
       case 'major':
-        return [0, 2, 4, 5, 7, 9, 11].includes(relativeNote);
+        passes = [0, 2, 4, 5, 7, 9, 11].includes(relativeNote);
+        break;
       case 'minor':
-        return [0, 2, 3, 5, 7, 8, 10].includes(relativeNote);
+        passes = [0, 2, 3, 5, 7, 8, 10].includes(relativeNote);
+        break;
       case 'dorian':
-        return [0, 2, 3, 5, 7, 9, 10].includes(relativeNote);
+        passes = [0, 2, 3, 5, 7, 9, 10].includes(relativeNote);
+        break;
       case 'mixolydian':
-        return [0, 2, 4, 5, 7, 9, 10].includes(relativeNote);
+        passes = [0, 2, 4, 5, 7, 9, 10].includes(relativeNote);
+        break;
       case 'lydian':
-        return [0, 2, 4, 6, 7, 9, 11].includes(relativeNote);
+        passes = [0, 2, 4, 6, 7, 9, 11].includes(relativeNote);
+        break;
       case 'phrygian':
-        return [0, 1, 3, 5, 7, 8, 10].includes(relativeNote);
+        passes = [0, 1, 3, 5, 7, 8, 10].includes(relativeNote);
+        break;
       case 'locrian':
-        return [0, 1, 3, 5, 6, 8, 10].includes(relativeNote);
+        passes = [0, 1, 3, 5, 6, 8, 10].includes(relativeNote);
+        break;
       default:
-        return true;
+        passes = true;
+        break;
     }
+    
+    if (!passes) {
+      console.log("AuraSonixEngine: note dropped by scale filter", { 
+        noteNumber, 
+        noteInOctave, 
+        rootNote: scaleFilter.rootNote, 
+        relativeNote, 
+        scale: scaleFilter.scale 
+      });
+    }
+    
+    return passes;
   }
 
   _getRootNoteValue(rootNote) {
