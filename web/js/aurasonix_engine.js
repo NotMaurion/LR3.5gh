@@ -127,6 +127,7 @@ class AuraSonixEngine {
         zones: this.currentPresetConfig.zones.map(z => ({
           name: z.name,
           range: `${z.minNote}-${z.maxNote}`,
+          baseNote: z.baseNote,
           volume: z.volume,
           probability: z.probability
         }))
@@ -204,10 +205,17 @@ class AuraSonixEngine {
       playbackRate = Math.pow(2, semitoneDifference / 12);
       console.log("AuraSonixEngine: pitch shifting applied", {
         noteNumber,
+        zoneName: selectedZone.name,
         zoneBaseNote: selectedZone.baseNote,
         zoneBaseNoteValue: zoneBaseNote,
         semitoneDifference,
-        playbackRate
+        playbackRate: playbackRate.toFixed(4)
+      });
+    } else {
+      console.log("AuraSonixEngine: no pitch shifting - no zone or baseNote", {
+        noteNumber,
+        selectedZone: selectedZone ? selectedZone.name : null,
+        hasBaseNote: selectedZone ? !!selectedZone.baseNote : false
       });
     }
 
