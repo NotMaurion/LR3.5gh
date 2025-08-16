@@ -158,7 +158,7 @@ class ZonesNotifier extends StateNotifier<List<ZoneConfig>> {
 
 // Provider global para el estado de las zonas
 final zonesProvider = StateNotifierProvider<ZonesNotifier, List<ZoneConfig>>((ref) {
-  return ZonesNotifier();
+  return ZonesNotifier(ref);
 });
 
 
