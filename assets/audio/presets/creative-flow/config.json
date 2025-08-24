@@ -1,53 +1,81 @@
 {
-    "version": 1,
-    "presetName": "Creative-Flow",
-    "description": "Un preset diseñado para inspirar la creatividad con un toque etéreo.",
-    "globalVolume": 0.9,
-    "layerVolumes": {
-      "bass": 0.85,
-      "mid": 0.75,
-      "high": 0.8,
-      "tex": 1.0
+  "name": "Creative-Flow",
+  "description": "Creative Flow preset with different configuration",
+  "version": "1.0.0",
+  "audioFiles": {
+    "bass": "bass.wav",
+    "mid": "mid.wav",
+    "high": "high.wav",
+    "tex": "tex.wav"
+  },
+  "defaultZones": [
+    {
+      "name": "Bass",
+      "minNote": 21,
+      "maxNote": 43,
+      "baseNote": "C2",
+      "volume": 0.8,
+      "probability": 0.9
     },
-    "midiConfig": {
-      "scaleFilter": {
-        "enabled": true,
-        "scale": "pentatonic_major",
-        "rootNote": "C"
-      }
+    {
+      "name": "Mid",
+      "minNote": 44,
+      "maxNote": 67,
+      "baseNote": "C4",
+      "volume": 0.7,
+      "probability": 0.8
     },
-    "effectsChain": [
-      {
-        "id": "main-envelope",
-        "type": "Envelope",
-        "enabled": true,
-        "parameters": {
-          "attack": 0.01,
-          "decay": 0.1,
-          "sustain": 0.8,
-          "release": 0.3
-        }
-      },
-      {
-        "id": "reverb-main",
-        "type": "Reverb",
-        "enabled": true,
-        "parameters": {
-          "wet": 0.3,
-          "roomSize": 0.7,
-          "damping": 0.5
-        }
-      },
-      {
-        "id": "delay-pingpong",
-        "type": "Delay",
-        "enabled": false,
-        "parameters": {
-          "time": "4n",
-          "feedback": 0.4,
-          "wet": 0.25
-        }
-      }
-    ]
+    {
+      "name": "High",
+      "minNote": 68,
+      "maxNote": 87,
+      "baseNote": "C5",
+      "volume": 0.6,
+      "probability": 0.7
+    },
+    {
+      "name": "Tex",
+      "minNote": 21,
+      "maxNote": 87,
+      "baseNote": "C3",
+      "volume": 0.5,
+      "probability": 0.6
+    }
+  ],
+  "defaultScaleFilter": {
+    "enabled": false,
+    "root": "C",
+    "mode": "chromatic",
+    "minOctave": 1,
+    "maxOctave": 7
+  },
+  "defaultAudioEffects": {
+    "reverb": {
+      "enabled": true,
+      "wet": 0.4,
+      "dry": 0.6,
+      "roomSize": 0.7,
+      "dampening": 0.6,
+      "preDelay": 0.02
+    },
+    "filter": {
+      "enabled": false,
+      "cutoff": 2000.0,
+      "resonance": 0.0,
+      "type": "lpf"
+    },
+    "envelope": {
+      "enabled": true,
+      "attack": 0.05,
+      "decay": 0.1,
+      "sustain": 0.9,
+      "release": 0.5
+    },
+    "sustain": {
+      "enabled": true,
+      "duration": 2.0,
+      "level": 0.8,
+      "infinite": false
+    }
   }
-  
+}

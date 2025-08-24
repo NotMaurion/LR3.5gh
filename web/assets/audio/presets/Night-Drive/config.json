@@ -1,0 +1,145 @@
+{
+  "metadata": {
+    "name": "Night-Drive",
+    "description": "Un preset diseñado para crear una atmósfera cinematográfica y contemplativa. Sonidos atmosféricos que evocan viajes nocturnos y reflexión.",
+    "version": "1.0.0",
+    "author": "LiveRoots",
+    "category": "Atmospheric",
+    "tags": ["night", "drive", "cinematic", "atmospheric", "contemplative", "moody"]
+  },
+  "audioFiles": {
+    "bass": "bass.wav",
+    "mid": "mid.wav", 
+    "high": "high.wav",
+    "tex": "tex.wav"
+  },
+  "defaultZones": [
+    {
+      "name": "Bass",
+      "minNote": 21,
+      "maxNote": 43,
+      "baseNote": "C2",
+      "volume": 0.9,
+      "probability": 0.7,
+      "description": "Bajos profundos para atmósfera cinematográfica"
+    },
+    {
+      "name": "Mid", 
+      "minNote": 44,
+      "maxNote": 67,
+      "baseNote": "C4",
+      "volume": 0.6,
+      "probability": 0.6,
+      "description": "Medios atmosféricos para melodías evocadoras"
+    },
+    {
+      "name": "High",
+      "minNote": 68,
+      "maxNote": 87,
+      "baseNote": "C5", 
+      "volume": 0.4,
+      "probability": 0.4,
+      "description": "Agudos sutiles para detalles atmosféricos"
+    },
+    {
+      "name": "Tex",
+      "minNote": 21,
+      "maxNote": 108,
+      "baseNote": "C3",
+      "volume": 0.5,
+      "probability": 0.5,
+      "description": "Textura atmosférica para ambiente envolvente con rango amplio"
+    }
+  ],
+  "defaultScaleFilter": {
+    "enabled": true,
+    "root": "C",
+    "mode": "pentatonic_major",
+    "minOctave": 2,
+    "maxOctave": 6,
+    "description": "Escala pentatónica mayor para atmósfera misteriosa"
+  },
+  "defaultAudioEffects": {
+    "reverb": {
+      "enabled": true,
+      "wet": 0.7,
+      "dry": 0.3,
+      "roomSize": 0.85,
+      "dampening": 0.7,
+      "preDelay": 0.08,
+      "description": "Reverb de hall atmosférico para espacio cinematográfico"
+    },
+    "filter": {
+      "enabled": true,
+      "cutoff": 2500.0,
+      "resonance": 0.3,
+      "type": "lpf",
+      "description": "Filtro cálido para sonidos más íntimos"
+    },
+    "envelope": {
+      "enabled": true,
+      "attack": 0.2,
+      "decay": 0.4,
+      "sustain": 0.9,
+      "release": 2.5,
+      "description": "Envelope suave para transiciones atmosféricas"
+    },
+    "sustain": {
+      "enabled": true,
+      "duration": 1.0,
+      "level": 0.95,
+      "infinite": false,
+      "description": "Sustain de 1 segundo para sonidos largos"
+    },
+    "globalVolume": 0.8,
+    "audioQuality": "High"
+  },
+  "defaultMidiRules": {
+    "velocityMapping": {
+      "enabled": true,
+      "minVelocity": 0.3,
+      "maxVelocity": 0.9,
+      "curve": "s-curve",
+      "description": "Mapeo de velocidad expresivo para dinámica"
+    },
+    "noteTransformation": {
+      "enabled": false,
+      "transpose": 0,
+      "octaveShift": 0,
+      "harmonization": "none",
+      "description": "Sin transformación para control directo"
+    },
+    "arpeggiator": {
+      "enabled": false,
+      "pattern": "up",
+      "rate": 0.5,
+      "octaves": 1,
+      "description": "Arpeggiator deshabilitado"
+    },
+    "quantization": {
+      "enabled": false,
+      "grid": "1/4",
+      "strength": 0.5,
+      "description": "Sin cuantización para fluidez natural"
+    },
+    "randomness": {
+      "enabled": true,
+      "amount": 0.25,
+      "type": "note",
+      "description": "Aleatoriedad moderada para organicidad"
+    },
+    "simultaneousNotes": {
+      "enabled": true,
+      "maxNotes": 6,
+      "voiceStealing": true,
+      "description": "Notas simultáneas moderadas para riqueza"
+    }
+  },
+  "presetSpecifics": {
+    "intendedUse": "Night driving, contemplation, atmospheric listening",
+    "mood": "Moody, contemplative, atmospheric",
+    "energyLevel": "Medium-Low",
+    "complexity": "Medium",
+    "recommendedDuration": "30-120 minutes"
+  }
+}

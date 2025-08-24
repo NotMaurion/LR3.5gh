@@ -1,0 +1,145 @@
+{
+  "metadata": {
+    "name": "Study",
+    "description": "Un preset diseñado para sesiones de estudio intensivo y aprendizaje. Sonidos estructurados y enfocados que promueven la retención y concentración académica.",
+    "version": "1.0.0",
+    "author": "LiveRoots",
+    "category": "Productivity",
+    "tags": ["study", "learning", "academic", "focused", "structured", "cognitive"]
+  },
+  "audioFiles": {
+    "bass": "bass.wav",
+    "mid": "mid.wav", 
+    "high": "high.wav",
+    "tex": "tex.wav"
+  },
+  "defaultZones": [
+    {
+      "name": "Bass",
+      "minNote": 21,
+      "maxNote": 43,
+      "baseNote": "C2",
+      "volume": 0.6,
+      "probability": 0.7,
+      "description": "Bajos estructurados para estabilidad cognitiva"
+    },
+    {
+      "name": "Mid", 
+      "minNote": 44,
+      "maxNote": 67,
+      "baseNote": "C4",
+      "volume": 0.7,
+      "probability": 0.8,
+      "description": "Medios claros para procesamiento de información"
+    },
+    {
+      "name": "High",
+      "minNote": 68,
+      "maxNote": 87,
+      "baseNote": "C5", 
+      "volume": 0.5,
+      "probability": 0.6,
+      "description": "Agudos definidos para claridad mental"
+    },
+    {
+      "name": "Tex",
+      "minNote": 21,
+      "maxNote": 108,
+      "baseNote": "C3",
+      "volume": 0.4,
+      "probability": 0.5,
+      "description": "Textura sutil para ambiente de estudio con rango amplio"
+    }
+  ],
+  "defaultScaleFilter": {
+    "enabled": true,
+    "root": "C",
+    "mode": "pentatonic_major",
+    "minOctave": 2,
+    "maxOctave": 6,
+    "description": "Escala pentatónica mayor para claridad y positividad"
+  },
+  "defaultAudioEffects": {
+    "reverb": {
+      "enabled": true,
+      "wet": 0.5,
+      "dry": 0.5,
+      "roomSize": 0.75,
+      "dampening": 0.6,
+      "preDelay": 0.03,
+      "description": "Reverb de hall moderado para claridad sin distracción"
+    },
+    "filter": {
+      "enabled": false,
+      "cutoff": 2000.0,
+      "resonance": 0.0,
+      "type": "lpf",
+      "description": "Filtro deshabilitado para máxima claridad"
+    },
+    "envelope": {
+      "enabled": true,
+      "attack": 0.1,
+      "decay": 0.2,
+      "sustain": 0.9,
+      "release": 1.5,
+      "description": "Envelope claro para definición precisa"
+    },
+    "sustain": {
+      "enabled": true,
+      "duration": 1.0,
+      "level": 0.9,
+      "infinite": false,
+      "description": "Sustain de 1 segundo para sonidos largos"
+    },
+    "globalVolume": 1.0,
+    "audioQuality": "High"
+  },
+  "defaultMidiRules": {
+    "velocityMapping": {
+      "enabled": true,
+      "minVelocity": 0.4,
+      "maxVelocity": 0.9,
+      "curve": "linear",
+      "description": "Mapeo de velocidad consistente para predictibilidad"
+    },
+    "noteTransformation": {
+      "enabled": false,
+      "transpose": 0,
+      "octaveShift": 0,
+      "harmonization": "none",
+      "description": "Sin transformación para simplicidad"
+    },
+    "arpeggiator": {
+      "enabled": false,
+      "pattern": "up",
+      "rate": 0.5,
+      "octaves": 1,
+      "description": "Arpeggiator deshabilitado"
+    },
+    "quantization": {
+      "enabled": true,
+      "grid": "1/8",
+      "strength": 0.7,
+      "description": "Cuantización moderada para estructura"
+    },
+    "randomness": {
+      "enabled": false,
+      "amount": 0.1,
+      "type": "note",
+      "description": "Sin aleatoriedad para predictibilidad"
+    },
+    "simultaneousNotes": {
+      "enabled": true,
+      "maxNotes": 6,
+      "voiceStealing": true,
+      "description": "Notas simultáneas moderadas para riqueza controlada"
+    }
+  },
+  "presetSpecifics": {
+    "intendedUse": "Study sessions, learning, academic work",
+    "mood": "Focused, clear, structured",
+    "energyLevel": "Medium",
+    "complexity": "Medium",
+    "recommendedDuration": "45-120 minutes"
+  }
+}

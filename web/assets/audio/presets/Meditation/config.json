@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "engineVersion": "web-aud-1.0",
+  "name": "Meditation",
+  "metadata": { "author": "LiveRoots Lab", "category": "User", "tags": ["example", "ultimate"] },
+
+  "audioFiles": {
+    "bass": "bass.wav",
+    "mid": "mid.wav",
+    "high": "high.wav",
+    "tex": "tex.wav"
+  },
+
+  "defaultZones": [
+    {
+      "name": "Bass",
+      "minNote": 21,
+      "maxNote": 43,
+      "baseNote": "C2",
+      "volume": 1,
+      "probability": 0.9,
+      "texture": { "enabled": true, "loop": true, "lfoRateHz": 0.20, "lfoDepth": 0.50 }
+    },
+    {
+      "name": "Mid",
+      "minNote": 44,
+      "maxNote": 67,
+      "baseNote": "C4",
+      "volume": 1,
+      "probability": 0.9,
+      "texture": { "enabled": true, "loop": true, "lfoRateHz": 0.20, "lfoDepth": 0.50 }
+    },
+    {
+      "name": "High",
+      "minNote": 68,
+      "maxNote": 87,
+      "baseNote": "C5",
+      "volume": 1,
+      "probability": 0.9,
+      "texture": { "enabled": true, "loop": true, "lfoRateHz": 0.20, "lfoDepth": 0.50 }
+    },
+    {
+      "name": "Tex",
+      "minNote": 21,
+      "maxNote": 87,
+      "baseNote": "C3",
+      "volume": 0.9,
+      "probability": 0.9,
+      "texture": { "enabled": true, "loop": true, "lfoRateHz": 0.20, "lfoDepth": 0.50 }
+    }
+  ],
+
+  "defaultScaleFilter": {
+    "enabled": true,
+    "root": "C",
+    "mode": "CHROMATIC",
+    "minOctave": 1,
+    "maxOctave": 7,
+    "behavior": "snap"
+  },
+
+  "defaultAudioEffects": {
+    "reverb": { "enabled": true, "wet": 0.40, "dry": 0.60, "roomSize": 0.70, "dampening": 0.60, "preDelay": 0.02 },
+    "filter": { "enabled": false, "type": "lpf", "cutoff": 2000.0, "resonance": 0.0 },
+    "envelope": { "enabled": true, "attack": 0.10, "decay": 0.20, "sustain": 0.80, "release": 1.00 },
+    "sustain": { "enabled": true, "duration": 3.00, "level": 0.90, "infinite": false },
+    "randomness": { "enabled": false, "pitchVariation": 0.10, "velocityVariation": 0.20, "timingVariation": 50.0, "sustainVariation": 0.30 },
+    "simultaneousNotes": { "enabled": false, "maxNotes": 8, "overlapProbability": 0.30, "voiceStealing": true, "voiceStealThreshold": 0.50 },
+    "globalVolume": 1.00,
+    "audioQuality": "High",
+    "layersEnabled": { "bass": true, "mid": true, "high": true, "tex": true }
+  },
+
+  "defaultMidiRules": {
+    "velocityRule": { "enabled": false, "minVelocity": 0.0, "maxVelocity": 1.0, "curve": "linear" },
+    "noteTransformation": { "enabled": false, "transpose": 0, "octaveShift": 0.0, "harmonize": false, "harmonyIntervals": [0, 7, 12] },
+    "arpeggiator": { "enabled": false, "pattern": "up", "rate": 8.0, "octaves": 1, "syncToTempo": false, "gateLength": 0.5 },
+    "quantization": { "enabled": false, "grid": "1/16", "strength": 0.8, "swing": false, "swingAmount": 0.5 },
+    "midiThru": false,
+    "recordMidi": false
+  },
+
+  "configSource": "exported from lab",
+  "configName": "config.json"
+}

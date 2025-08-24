@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../state/scale_filter_state.dart';
+import '../../../state/active_preset_provider.dart';
 
 class ScalesPanel extends ConsumerWidget {
   const ScalesPanel({super.key});
@@ -9,19 +10,90 @@ class ScalesPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final scaleState = ref.watch(scaleFilterProvider);
     final notifier = ref.read(scaleFilterProvider.notifier);
+    final activePreset = ref.watch(activePresetProvider);
+
+    if (activePreset == null) {
+      return const Center(
+        child: Text(
+          'No preset selected. Please select a preset from the main screen.',
+          style: TextStyle(color: Colors.grey),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Scale & Filter Configuration',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
+          // Active preset indicator
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF10D38F).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFF10D38F).withOpacity(0.3),
+                width: 1,
+              ),
             ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.music_note,
+                  color: const Color(0xFF10D38F),
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Fine-tuning: ${activePreset.replaceAll('-', ' ')}',
+                  style: const TextStyle(
+                    color: Color(0xFF10D38F),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          
+          // Reset Button
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Scale & Filter Configuration',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: () {
+                  notifier.setEnabled(true);
+                  notifier.setRoot('C');
+                  notifier.setMode('PENTATONIC_MAJOR');
+                  notifier.setMinOctave(2);
+                  notifier.setMaxOctave(6);
+                },
+                icon: const Icon(Icons.refresh, color: Colors.white),
+                label: const Text(
+                  'Reset',
+                  style: TextStyle(color: Colors.white),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF10D38F),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 24),
           
