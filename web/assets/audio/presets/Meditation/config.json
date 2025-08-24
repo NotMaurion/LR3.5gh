@@ -60,12 +60,12 @@
   },
 
   "defaultAudioEffects": {
-    "reverb": { "enabled": true, "wet": 0.40, "dry": 0.60, "roomSize": 0.70, "dampening": 0.60, "preDelay": 0.02 },
+    "reverb": { "enabled": true, "wet": 0.61, "dry": 0.39, "roomSize": 0.90, "dampening": 0.80, "preDelay": 0.05 },
     "filter": { "enabled": false, "type": "lpf", "cutoff": 2000.0, "resonance": 0.0 },
     "envelope": { "enabled": true, "attack": 0.10, "decay": 0.20, "sustain": 0.80, "release": 1.00 },
     "sustain": { "enabled": true, "duration": 3.00, "level": 0.90, "infinite": false },
     "randomness": { "enabled": false, "pitchVariation": 0.10, "velocityVariation": 0.20, "timingVariation": 50.0, "sustainVariation": 0.30 },
-    "simultaneousNotes": { "enabled": false, "maxNotes": 8, "overlapProbability": 0.30, "voiceStealing": true, "voiceStealThreshold": 0.50 },
+    "simultaneousNotes": { "enabled": true, "maxNotes": 8, "overlapProbability": 0.30, "voiceStealing": true, "voiceStealThreshold": 0.50 },
     "globalVolume": 1.00,
     "audioQuality": "High",
     "layersEnabled": { "bass": true, "mid": true, "high": true, "tex": true }

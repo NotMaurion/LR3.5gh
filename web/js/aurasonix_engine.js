@@ -400,21 +400,15 @@ class AuraSonixEngine {
         }
       };
       
-      // LAB parity: do not apply preset-specific overrides. Use exactly what LAB provides.
+      // LAB parity: Use exactly what config.json provides, no overrides
+      // Only apply defaults if config.json is missing or incomplete
+      if (!config || !config.defaultAudioEffects) {
+        console.log("AuraSonixEngine: No config.json found, using defaults");
+      } else {
+        console.log("AuraSonixEngine: Using exact values from config.json");
+      }
 
-      // Ensure a decent, always-on reverb baseline for every preset
-      try {
-        const fx = this.currentPresetConfig.audioEffects || {};
-        const rv = fx.reverb || {};
-        if (rv.enabled !== true) rv.enabled = true;
-        if (typeof rv.wet !== 'number') rv.wet = 0.5;
-        if (typeof rv.dry !== 'number') rv.dry = 0.5;
-        if (typeof rv.roomSize !== 'number') rv.roomSize = 0.8;
-        if (typeof rv.dampening !== 'number') rv.dampening = 0.6;
-        if (typeof rv.preDelay !== 'number') rv.preDelay = 0.02;
-        fx.reverb = rv;
-        this.currentPresetConfig.audioEffects = fx;
-      } catch (_) {}
+      // LAB parity: do not apply preset-specific overrides. Use exactly what LAB provides.
       
       console.log("AuraSonixEngine: using config for preset:", presetName, {
         zones: this.currentPresetConfig.zones.length,
