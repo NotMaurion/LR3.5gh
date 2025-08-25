@@ -5,6 +5,7 @@ import '../state/active_preset_provider.dart';
 import '../state/live_mode_provider.dart';
 import '../state/scale_filter_state.dart';
 import '../state/zones_state.dart';
+import '../state/audio_effects_state.dart';
 import '../services/preset_io_service.dart';
 import 'dart:html' as html;
 import 'lab/panels/zones_panel.dart';
