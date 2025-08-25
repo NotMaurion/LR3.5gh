@@ -885,73 +885,73 @@ class AudioEffectsNotifier extends StateNotifier<AudioEffectsState> {
       print('AudioEffectsNotifier: received effects data from engine: $effectsData');
       
       if (effectsData != null) {
-        // Parse reverb settings
+        // Parse reverb settings with validation
         final reverbData = effectsData['reverb'] ?? {};
         final reverb = ReverbSettings(
           enabled: reverbData['enabled'] ?? true,
-          wet: (reverbData['wet'] ?? 0.6).toDouble(),
-          dry: (reverbData['dry'] ?? 0.4).toDouble(),
-          roomSize: (reverbData['roomSize'] ?? 0.9).toDouble(),
-          dampening: (reverbData['dampening'] ?? 0.8).toDouble(),
-          preDelay: (reverbData['preDelay'] ?? 0.05).toDouble(),
+          wet: _clampDouble((reverbData['wet'] ?? 0.6).toDouble(), 0.0, 1.0),
+          dry: _clampDouble((reverbData['dry'] ?? 0.4).toDouble(), 0.0, 1.0),
+          roomSize: _clampDouble((reverbData['roomSize'] ?? 0.9).toDouble(), 0.0, 1.0),
+          dampening: _clampDouble((reverbData['dampening'] ?? 0.8).toDouble(), 0.0, 1.0),
+          preDelay: _clampDouble((reverbData['preDelay'] ?? 0.05).toDouble(), 0.0, 1.0),
         );
 
-        // Parse filter settings
+        // Parse filter settings with validation
         final filterData = effectsData['filter'] ?? {};
         final filter = FilterSettings(
           enabled: filterData['enabled'] ?? false,
-          cutoff: (filterData['cutoff'] ?? 2000.0).toDouble(),
-          resonance: (filterData['resonance'] ?? 0.0).toDouble(),
+          cutoff: _clampDouble((filterData['cutoff'] ?? 2000.0).toDouble(), 20.0, 20000.0),
+          resonance: _clampDouble((filterData['resonance'] ?? 0.0).toDouble(), 0.0, 20.0),
           type: filterData['type'] ?? 'lpf',
         );
 
-        // Parse envelope settings
+        // Parse envelope settings with validation
         final envelopeData = effectsData['envelope'] ?? {};
         final envelope = EnvelopeSettings(
           enabled: envelopeData['enabled'] ?? true,
-          attack: (envelopeData['attack'] ?? 0.1).toDouble(),
-          decay: (envelopeData['decay'] ?? 0.2).toDouble(),
-          sustain: (envelopeData['sustain'] ?? 0.8).toDouble(),
-          release: (envelopeData['release'] ?? 1.0).toDouble(),
+          attack: _clampDouble((envelopeData['attack'] ?? 0.1).toDouble(), 0.001, 10.0),
+          decay: _clampDouble((envelopeData['decay'] ?? 0.2).toDouble(), 0.001, 10.0),
+          sustain: _clampDouble((envelopeData['sustain'] ?? 0.8).toDouble(), 0.0, 1.0),
+          release: _clampDouble((envelopeData['release'] ?? 1.0).toDouble(), 0.001, 10.0),
         );
 
-        // Parse sustain settings
+        // Parse sustain settings with validation
         final sustainData = effectsData['sustain'] ?? {};
         final sustain = SustainSettings(
           enabled: sustainData['enabled'] ?? true,
-          duration: (sustainData['duration'] ?? 3.0).toDouble(),
-          level: (sustainData['level'] ?? 0.9).toDouble(),
+          duration: _clampDouble((sustainData['duration'] ?? 3.0).toDouble(), 0.1, 60.0),
+          level: _clampDouble((sustainData['level'] ?? 0.9).toDouble(), 0.0, 1.0),
           infinite: sustainData['infinite'] ?? false,
         );
 
-        // Parse randomness settings
+        // Parse randomness settings with validation
         final randomnessData = effectsData['randomness'] ?? {};
         final randomness = RandomnessSettings(
           enabled: randomnessData['enabled'] ?? false,
-          pitchVariation: (randomnessData['pitchVariation'] ?? 0.1).toDouble(),
-          velocityVariation: (randomnessData['velocityVariation'] ?? 0.2).toDouble(),
-          timingVariation: (randomnessData['timingVariation'] ?? 50.0).toDouble(),
-          sustainVariation: (randomnessData['sustainVariation'] ?? 0.3).toDouble(),
+          pitchVariation: _clampDouble((randomnessData['pitchVariation'] ?? 0.1).toDouble(), 0.0, 12.0),
+          velocityVariation: _clampDouble((randomnessData['velocityVariation'] ?? 0.2).toDouble(), 0.0, 1.0),
+          timingVariation: _clampDouble((randomnessData['timingVariation'] ?? 50.0).toDouble(), 0.0, 1000.0),
+          sustainVariation: _clampDouble((randomnessData['sustainVariation'] ?? 0.3).toDouble(), 0.0, 1.0),
         );
 
-        // Parse simultaneous notes settings
+        // Parse simultaneous notes settings with validation
         final simultaneousData = effectsData['simultaneousNotes'] ?? {};
         final simultaneousNotes = SimultaneousNotesSettings(
           enabled: simultaneousData['enabled'] ?? true,
-          maxNotes: simultaneousData['maxNotes'] ?? 8,
-          overlapProbability: (simultaneousData['overlapProbability'] ?? 0.3).toDouble(),
+          maxNotes: _clampInt(simultaneousData['maxNotes'] ?? 8, 1, 32),
+          overlapProbability: _clampDouble((simultaneousData['overlapProbability'] ?? 0.3).toDouble(), 0.0, 1.0),
           voiceStealing: simultaneousData['voiceStealing'] ?? true,
-          voiceStealThreshold: (simultaneousData['voiceStealThreshold'] ?? 0.5).toDouble(),
+          voiceStealThreshold: _clampDouble((simultaneousData['voiceStealThreshold'] ?? 0.5).toDouble(), 0.0, 1.0),
         );
 
-        // Parse polyphony settings
+        // Parse polyphony settings with validation
         final polyphonyData = effectsData['polyphony'] ?? {};
         final polyphony = PolyphonySettings(
           enabled: polyphonyData['enabled'] ?? true,
-          limit: polyphonyData['limit'] ?? 12,
+          limit: _clampInt(polyphonyData['limit'] ?? 12, 1, 32),
           voiceStealing: polyphonyData['voiceStealing'] ?? true,
           stealOldest: polyphonyData['stealOldest'] ?? true,
-          releaseTime: (polyphonyData['releaseTime'] ?? 0.1).toDouble(),
+          releaseTime: _clampDouble((polyphonyData['releaseTime'] ?? 0.1).toDouble(), 0.01, 1.0),
         );
 
         // Parse layers enabled settings
@@ -972,7 +972,7 @@ class AudioEffectsNotifier extends StateNotifier<AudioEffectsState> {
           randomness: randomness,
           simultaneousNotes: simultaneousNotes,
           polyphony: polyphony,
-          globalVolume: (effectsData['globalVolume'] ?? 1.0).toDouble(),
+          globalVolume: _clampDouble((effectsData['globalVolume'] ?? 1.0).toDouble(), 0.0, 1.0),
           audioQuality: effectsData['audioQuality'] ?? 'High',
           layersEnabled: layersEnabled,
         );
@@ -984,6 +984,19 @@ class AudioEffectsNotifier extends StateNotifier<AudioEffectsState> {
     } catch (e) {
       print('AudioEffectsNotifier: failed to load from engine: $e');
     }
+  }
+
+  // Helper methods for value validation
+  double _clampDouble(double value, double min, double max) {
+    if (value.isNaN || value.isInfinite) {
+      print('AudioEffectsNotifier: Invalid double value $value, using default');
+      return min;
+    }
+    return value.clamp(min, max);
+  }
+
+  int _clampInt(int value, int min, int max) {
+    return value.clamp(min, max);
   }
 }
 
