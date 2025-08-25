@@ -203,6 +203,70 @@ class AuraSonixEngine {
     };
   }
 
+  // Get current audio effects configuration for LAB UI
+  getCurrentAudioEffects() {
+    const cfg = this.currentPresetConfig || {};
+    const effects = cfg.audioEffects || {};
+    return {
+      reverb: effects.reverb || {
+        enabled: true,
+        wet: 0.6,
+        dry: 0.4,
+        roomSize: 0.9,
+        dampening: 0.8,
+        preDelay: 0.05
+      },
+      filter: effects.filter || {
+        enabled: false,
+        cutoff: 2000.0,
+        resonance: 0.0,
+        type: 'lpf'
+      },
+      envelope: effects.envelope || {
+        enabled: true,
+        attack: 0.1,
+        decay: 0.2,
+        sustain: 0.8,
+        release: 1.0
+      },
+      sustain: effects.sustain || {
+        enabled: true,
+        duration: 3.0,
+        level: 0.9,
+        infinite: false
+      },
+      randomness: effects.randomness || {
+        enabled: false,
+        pitchVariation: 0.1,
+        velocityVariation: 0.2,
+        timingVariation: 50.0,
+        sustainVariation: 0.3
+      },
+      simultaneousNotes: effects.simultaneousNotes || {
+        enabled: true,
+        maxNotes: 8,
+        overlapProbability: 0.3,
+        voiceStealing: true,
+        voiceStealThreshold: 0.5
+      },
+      polyphony: effects.polyphony || {
+        enabled: true,
+        limit: 12,
+        voiceStealing: true,
+        stealOldest: true,
+        releaseTime: 0.1
+      },
+      globalVolume: effects.globalVolume || 1.0,
+      audioQuality: effects.audioQuality || 'High',
+      layersEnabled: effects.layersEnabled || {
+        bass: true,
+        mid: true,
+        high: true,
+        tex: true
+      }
+    };
+  }
+
   // Get current zones configuration for LAB UI
   getCurrentZones() {
     const cfg = this.currentPresetConfig || {};

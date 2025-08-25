@@ -82,6 +82,15 @@ class WebAudioEngine implements AudioEngine {
     return list.map((item) => Map<String, dynamic>.from(item as Map)).toList();
   }
 
+  Future<Map<String, dynamic>> getCurrentAudioEffects() async {
+    if (_engineInstance == null) {
+      await init();
+    }
+    final obj = js_util.callMethod(_engineInstance, 'getCurrentAudioEffects', const []);
+    final dartified = js_util.dartify(obj);
+    return Map<String, dynamic>.from(dartified as Map);
+  }
+
   @override
   void playNote(int noteNumber, {double velocity = 1.0}) {
     if (_engineInstance == null) return;

@@ -519,6 +519,10 @@ class AudioPanel extends ConsumerWidget {
                 _buildSimultaneousNotesSection(context, effectsState, effectsNotifier),
                 const SizedBox(height: 16),
                 
+                // Polyphony Section
+                _buildPolyphonySection(context, effectsState, effectsNotifier),
+                const SizedBox(height: 16),
+                
                 // Global Volume Slider
                 _buildSliderSection(
                   context: context,
@@ -1227,6 +1231,100 @@ class AudioPanel extends ConsumerWidget {
             divisions: 100,
             label: '${(state.simultaneousNotes.voiceStealThreshold * 100).round()}%',
             onChanged: notifier.setVoiceStealThreshold,
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildPolyphonySection(BuildContext context, AudioEffectsState state, AudioEffectsNotifier notifier) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Switch(
+                      value: state.polyphony.enabled,
+                      onChanged: notifier.setPolyphonyEnabled,
+                      activeColor: const Color(0xFF10D38F),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Polyphony',
+                      style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (state.polyphony.enabled) ...[
+          const SizedBox(height: 8),
+          _buildSliderSection(
+            context: context,
+            title: 'Polyphony Limit',
+            value: state.polyphony.limit.toDouble(),
+            min: 1.0,
+            max: 32.0,
+            divisions: 31,
+            label: '${state.polyphony.limit}',
+            onChanged: (value) => notifier.setPolyphonyLimit(value.round()),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Voice Stealing',
+                      style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 4),
+                    Switch(
+                      value: state.polyphony.voiceStealing,
+                      onChanged: notifier.setPolyphonyVoiceStealing,
+                      activeColor: const Color(0xFF10D38F),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Steal Oldest',
+                      style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 4),
+                    Switch(
+                      value: state.polyphony.stealOldest,
+                      onChanged: notifier.setPolyphonyStealOldest,
+                      activeColor: const Color(0xFF10D38F),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _buildSliderSection(
+            context: context,
+            title: 'Release Time',
+            value: state.polyphony.releaseTime,
+            min: 0.01,
+            max: 1.0,
+            divisions: 99,
+            label: '${state.polyphony.releaseTime.toStringAsFixed(2)}s',
+            onChanged: notifier.setPolyphonyReleaseTime,
           ),
         ],
       ],

@@ -28,6 +28,7 @@ class LabScreen extends ConsumerWidget {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await ref.read(scaleFilterProvider.notifier).loadFromEngine();
       await ref.read(zonesProvider.notifier).loadFromEngine();
+      await ref.read(audioEffectsProvider.notifier).loadFromEngine();
     });
     
     return DefaultTabController(

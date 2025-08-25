@@ -249,6 +249,48 @@ class SimultaneousNotesSettings {
   }
 }
 
+class PolyphonySettings {
+  final bool enabled;
+  final int limit; // Maximum number of voices
+  final bool voiceStealing; // Enable voice stealing
+  final bool stealOldest; // Steal oldest voice when limit reached
+  final double releaseTime; // Release time for stolen voices
+
+  const PolyphonySettings({
+    this.enabled = true,
+    this.limit = 12,
+    this.voiceStealing = true,
+    this.stealOldest = true,
+    this.releaseTime = 0.1,
+  });
+
+  PolyphonySettings copyWith({
+    bool? enabled,
+    int? limit,
+    bool? voiceStealing,
+    bool? stealOldest,
+    double? releaseTime,
+  }) {
+    return PolyphonySettings(
+      enabled: enabled ?? this.enabled,
+      limit: limit ?? this.limit,
+      voiceStealing: voiceStealing ?? this.voiceStealing,
+      stealOldest: stealOldest ?? this.stealOldest,
+      releaseTime: releaseTime ?? this.releaseTime,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'enabled': enabled,
+      'limit': limit,
+      'voiceStealing': voiceStealing,
+      'stealOldest': stealOldest,
+      'releaseTime': releaseTime,
+    };
+  }
+}
+
 class LayersEnabledSettings {
   final bool bass;
   final bool mid;
@@ -291,6 +333,7 @@ class AudioEffectsState {
   final SustainSettings sustain;
   final RandomnessSettings randomness;
   final SimultaneousNotesSettings simultaneousNotes;
+  final PolyphonySettings polyphony;
   final double globalVolume;
   final String audioQuality;
   final LayersEnabledSettings layersEnabled;
@@ -320,6 +363,13 @@ class AudioEffectsState {
     ),
     this.randomness = const RandomnessSettings(),
     this.simultaneousNotes = const SimultaneousNotesSettings(),
+    this.polyphony = const PolyphonySettings(
+      enabled: true,
+      limit: 12,
+      voiceStealing: true,
+      stealOldest: true,
+      releaseTime: 0.1,
+    ),
     this.globalVolume = 1.0,
     this.audioQuality = 'High',
     this.layersEnabled = const LayersEnabledSettings(),
@@ -332,6 +382,7 @@ class AudioEffectsState {
     SustainSettings? sustain,
     RandomnessSettings? randomness,
     SimultaneousNotesSettings? simultaneousNotes,
+    PolyphonySettings? polyphony,
     double? globalVolume,
     String? audioQuality,
     LayersEnabledSettings? layersEnabled,
@@ -343,6 +394,7 @@ class AudioEffectsState {
       sustain: sustain ?? this.sustain,
       randomness: randomness ?? this.randomness,
       simultaneousNotes: simultaneousNotes ?? this.simultaneousNotes,
+      polyphony: polyphony ?? this.polyphony,
       globalVolume: globalVolume ?? this.globalVolume,
       audioQuality: audioQuality ?? this.audioQuality,
       layersEnabled: layersEnabled ?? this.layersEnabled,
@@ -357,6 +409,7 @@ class AudioEffectsState {
       'sustain': sustain.toMap(),
       'randomness': randomness.toMap(),
       'simultaneousNotes': simultaneousNotes.toMap(),
+      'polyphony': polyphony.toMap(),
       'globalVolume': globalVolume,
       'audioQuality': audioQuality,
       'layersEnabled': layersEnabled.toMap(),
@@ -787,6 +840,32 @@ class AudioEffectsNotifier extends StateNotifier<AudioEffectsState> {
     _pushToEngine();
   }
 
+  // Polyphony methods
+  void setPolyphonyEnabled(bool enabled) {
+    state = state.copyWith(polyphony: state.polyphony.copyWith(enabled: enabled));
+    _pushToEngine();
+  }
+
+  void setPolyphonyLimit(int limit) {
+    state = state.copyWith(polyphony: state.polyphony.copyWith(limit: limit));
+    _pushToEngine();
+  }
+
+  void setPolyphonyVoiceStealing(bool enabled) {
+    state = state.copyWith(polyphony: state.polyphony.copyWith(voiceStealing: enabled));
+    _pushToEngine();
+  }
+
+  void setPolyphonyStealOldest(bool enabled) {
+    state = state.copyWith(polyphony: state.polyphony.copyWith(stealOldest: enabled));
+    _pushToEngine();
+  }
+
+  void setPolyphonyReleaseTime(double releaseTime) {
+    state = state.copyWith(polyphony: state.polyphony.copyWith(releaseTime: releaseTime));
+    _pushToEngine();
+  }
+
   void _pushToEngine() {
     try {
       final engine = _ref.read(audioEngineProvider);
@@ -795,6 +874,115 @@ class AudioEffectsNotifier extends StateNotifier<AudioEffectsState> {
       print('AudioEffectsNotifier: pushed to engine - $effectsData');
     } catch (e) {
       print('AudioEffectsNotifier: failed to push to engine: $e');
+    }
+  }
+
+  Future<void> loadFromEngine() async {
+    try {
+      final engine = _ref.read(audioEngineProvider);
+      // ignore: avoid_dynamic_calls
+      final effectsData = await (engine as dynamic).getCurrentAudioEffects();
+      print('AudioEffectsNotifier: received effects data from engine: $effectsData');
+      
+      if (effectsData != null) {
+        // Parse reverb settings
+        final reverbData = effectsData['reverb'] ?? {};
+        final reverb = ReverbSettings(
+          enabled: reverbData['enabled'] ?? true,
+          wet: (reverbData['wet'] ?? 0.6).toDouble(),
+          dry: (reverbData['dry'] ?? 0.4).toDouble(),
+          roomSize: (reverbData['roomSize'] ?? 0.9).toDouble(),
+          dampening: (reverbData['dampening'] ?? 0.8).toDouble(),
+          preDelay: (reverbData['preDelay'] ?? 0.05).toDouble(),
+        );
+
+        // Parse filter settings
+        final filterData = effectsData['filter'] ?? {};
+        final filter = FilterSettings(
+          enabled: filterData['enabled'] ?? false,
+          cutoff: (filterData['cutoff'] ?? 2000.0).toDouble(),
+          resonance: (filterData['resonance'] ?? 0.0).toDouble(),
+          type: filterData['type'] ?? 'lpf',
+        );
+
+        // Parse envelope settings
+        final envelopeData = effectsData['envelope'] ?? {};
+        final envelope = EnvelopeSettings(
+          enabled: envelopeData['enabled'] ?? true,
+          attack: (envelopeData['attack'] ?? 0.1).toDouble(),
+          decay: (envelopeData['decay'] ?? 0.2).toDouble(),
+          sustain: (envelopeData['sustain'] ?? 0.8).toDouble(),
+          release: (envelopeData['release'] ?? 1.0).toDouble(),
+        );
+
+        // Parse sustain settings
+        final sustainData = effectsData['sustain'] ?? {};
+        final sustain = SustainSettings(
+          enabled: sustainData['enabled'] ?? true,
+          duration: (sustainData['duration'] ?? 3.0).toDouble(),
+          level: (sustainData['level'] ?? 0.9).toDouble(),
+          infinite: sustainData['infinite'] ?? false,
+        );
+
+        // Parse randomness settings
+        final randomnessData = effectsData['randomness'] ?? {};
+        final randomness = RandomnessSettings(
+          enabled: randomnessData['enabled'] ?? false,
+          pitchVariation: (randomnessData['pitchVariation'] ?? 0.1).toDouble(),
+          velocityVariation: (randomnessData['velocityVariation'] ?? 0.2).toDouble(),
+          timingVariation: (randomnessData['timingVariation'] ?? 50.0).toDouble(),
+          sustainVariation: (randomnessData['sustainVariation'] ?? 0.3).toDouble(),
+        );
+
+        // Parse simultaneous notes settings
+        final simultaneousData = effectsData['simultaneousNotes'] ?? {};
+        final simultaneousNotes = SimultaneousNotesSettings(
+          enabled: simultaneousData['enabled'] ?? true,
+          maxNotes: simultaneousData['maxNotes'] ?? 8,
+          overlapProbability: (simultaneousData['overlapProbability'] ?? 0.3).toDouble(),
+          voiceStealing: simultaneousData['voiceStealing'] ?? true,
+          voiceStealThreshold: (simultaneousData['voiceStealThreshold'] ?? 0.5).toDouble(),
+        );
+
+        // Parse polyphony settings
+        final polyphonyData = effectsData['polyphony'] ?? {};
+        final polyphony = PolyphonySettings(
+          enabled: polyphonyData['enabled'] ?? true,
+          limit: polyphonyData['limit'] ?? 12,
+          voiceStealing: polyphonyData['voiceStealing'] ?? true,
+          stealOldest: polyphonyData['stealOldest'] ?? true,
+          releaseTime: (polyphonyData['releaseTime'] ?? 0.1).toDouble(),
+        );
+
+        // Parse layers enabled settings
+        final layersData = effectsData['layersEnabled'] ?? {};
+        final layersEnabled = LayersEnabledSettings(
+          bass: layersData['bass'] ?? true,
+          mid: layersData['mid'] ?? true,
+          high: layersData['high'] ?? true,
+          tex: layersData['tex'] ?? true,
+        );
+
+        // Update state with loaded data
+        state = AudioEffectsState(
+          reverb: reverb,
+          filter: filter,
+          envelope: envelope,
+          sustain: sustain,
+          randomness: randomness,
+          simultaneousNotes: simultaneousNotes,
+          polyphony: polyphony,
+          globalVolume: (effectsData['globalVolume'] ?? 1.0).toDouble(),
+          audioQuality: effectsData['audioQuality'] ?? 'High',
+          layersEnabled: layersEnabled,
+        );
+
+        print('AudioEffectsNotifier: loaded from engine - ${state.toMap()}');
+      } else {
+        print('AudioEffectsNotifier: no effects data received from engine');
+      }
+    } catch (e) {
+      print('AudioEffectsNotifier: failed to load from engine: $e');
     }
   }
 }

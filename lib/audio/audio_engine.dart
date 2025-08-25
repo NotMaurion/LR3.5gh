@@ -20,6 +20,7 @@ abstract class AudioEngine {
   Future<Map<String, dynamic>> getEmbeddedAudioDataUrls();
   Future<Map<String, dynamic>> getCurrentScaleFilter();
   Future<List<Map<String, dynamic>>> getCurrentZones();
+  Future<Map<String, dynamic>> getCurrentAudioEffects();
 }
 
 
