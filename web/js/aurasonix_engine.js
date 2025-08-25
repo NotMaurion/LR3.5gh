@@ -67,6 +67,14 @@ class AuraSonixEngine {
     this.NOTE_CLEANUP_INTERVAL = 5000; // Clean up orphaned sources every 5 seconds
     this._lastCleanupTime = Date.now();
     
+    // Polyphony management
+    this.activeVoices = new Map(); // noteNumber -> { source, startTime, velocity, noteName }
+    this.voiceCounter = 0; // For unique voice IDs
+    this.polyphonyLimit = 12; // Default polyphony limit
+    this.voiceStealingEnabled = true;
+    this.stealOldest = true;
+    this.releaseTime = 0.1; // Default release time for voice stealing
+    
     // Default configuration
     this.currentPresetConfig = {};
     this.currentPresetConfig.zones = [];
@@ -78,12 +86,13 @@ class AuraSonixEngine {
       maxOctave: 6 
     };
     this.currentPresetConfig.audioEffects = {
-      reverb: { enabled: true, wet: 0.6, dry: 0.4, roomSize: 0.9, dampening: 0.8, preDelay: 0.05 }, // Cathedral effect
+      reverb: { enabled: true, wet: 0.7, dry: 0.3, roomSize: 0.85, dampening: 0.7, preDelay: 0.05 },
       filter: { enabled: false, cutoff: 2000.0, resonance: 0.0, type: 'lpf' },
-      envelope: { enabled: true, attack: 0.1, decay: 0.2, sustain: 0.8, release: 1.0 }, // Strings-like envelope
+      envelope: { enabled: true, attack: 0.2, decay: 0.3, sustain: 0.8, release: 1.0 },
       sustain: { enabled: true, duration: 3.0, level: 0.9, infinite: false },
       randomness: { enabled: false, pitchVariation: 0.1, velocityVariation: 0.2, timingVariation: 50.0, sustainVariation: 0.3 },
       simultaneousNotes: { enabled: true, maxNotes: 8, overlapProbability: 0.3, voiceStealing: true, voiceStealThreshold: 0.5 },
+      polyphony: { enabled: true, limit: 12, voiceStealing: true, stealOldest: true, releaseTime: 0.1 },
       globalVolume: 1.0,
       audioQuality: 'High'
     };
@@ -387,6 +396,7 @@ class AuraSonixEngine {
           sustain: { enabled: true, duration: 3.0, level: 0.9, infinite: false },
           randomness: { enabled: false, pitchVariation: 0.1, velocityVariation: 0.2, timingVariation: 50.0, sustainVariation: 0.3 },
           simultaneousNotes: { enabled: true, maxNotes: 8, overlapProbability: 0.3, voiceStealing: true, voiceStealThreshold: 0.5 },
+          polyphony: { enabled: true, limit: 12, voiceStealing: true, stealOldest: true, releaseTime: 0.1 },
           globalVolume: 1.0,
           audioQuality: 'High'
         },
@@ -548,7 +558,19 @@ class AuraSonixEngine {
     // Performance optimization: Clean up orphaned sources periodically
     this._cleanupOrphanedSources();
 
-    // Performance optimization: Check if we can play this note
+    // Polyphony management: Check if we can play this voice
+    if (!this._canPlayVoice(noteNumber)) {
+      // Try to steal oldest voice to make room
+      this._stealOldestVoice();
+      
+      // Check again after stealing
+      if (!this._canPlayVoice(noteNumber)) {
+        console.warn(`AuraSonixEngine: Cannot play note ${noteNumber}, polyphony limit reached and voice stealing failed`);
+        return;
+      }
+    }
+
+    // Performance optimization: Check if we can play this note (legacy check)
     if (!this._canPlayNote(noteNumber)) {
       // Try to steal oldest voice to make room
       this._stealOldestVoice();
@@ -781,6 +803,7 @@ class AuraSonixEngine {
     console.log("AuraSonixEngine: playing note", {
       noteNumber,
       noteName: this._getNoteName(noteNumber),
+      velocity,
       bufferDuration: buffer.duration,
       bufferSampleRate: buffer.sampleRate,
       bufferChannels: buffer.numberOfChannels,
@@ -827,6 +850,9 @@ class AuraSonixEngine {
       }
     }
     
+    // Polyphony management: Add voice to active voices tracking
+    this._addVoice(noteNumber, src, velocity);
+    
     // Performance optimization: Track active sources with better cleanup
     this.activeSources.add(src);
     // Track by note for precise stop
@@ -834,6 +860,9 @@ class AuraSonixEngine {
     this.activeByNote[noteNumber].add(src);
     
     src.onended = () => {
+      // Polyphony management: Remove voice from active voices
+      this._removeVoice(noteNumber);
+      
       this.activeSources.delete(src);
       const set = this.activeByNote[noteNumber];
       if (set) {
@@ -893,6 +922,9 @@ class AuraSonixEngine {
   _clamp01(v) { return Math.max(0, Math.min(1, v)); }
 
   stopNote(noteNumber) {
+    // Polyphony management: Release voice with proper ADSR
+    this._releaseVoice(noteNumber);
+    
     // Prefer stopping by original input mapping to avoid killing other voices that snapped to the same pitch
     const set = this.activeByInputNote[noteNumber] || this.activeByNote[noteNumber];
     if (!set || set.size === 0) return;
@@ -924,6 +956,10 @@ class AuraSonixEngine {
 
   stopAll() {
     try {
+      // Polyphony management: Clear all active voices
+      this.activeVoices.clear();
+      this.voiceCounter = 0;
+      
       for (const src of this.activeSources) {
         try { 
           if (src.playbackState === 'running' || src.playbackState === 'suspended') {
@@ -1742,6 +1778,156 @@ class AuraSonixEngine {
     this.MAX_CONCURRENT_NOTES_PER_NOTE = newLimits.maxPerNote;
     
     console.log(`AuraSonixEngine: Adjusted performance limits for ${deviceType}:`, newLimits);
+  }
+
+  // Polyphony management: Get current polyphony settings from config
+  _getPolyphonySettings() {
+    const effects = this.currentPresetConfig?.audioEffects || {};
+    const polyphony = effects.polyphony || {};
+    
+    return {
+      enabled: polyphony.enabled !== false,
+      limit: polyphony.limit || this.polyphonyLimit,
+      voiceStealing: polyphony.voiceStealing !== false,
+      stealOldest: polyphony.stealOldest !== false,
+      releaseTime: polyphony.releaseTime || this.releaseTime
+    };
+  }
+
+  // Polyphony management: Check if we can play a new voice
+  _canPlayVoice(noteNumber) {
+    const settings = this._getPolyphonySettings();
+    
+    if (!settings.enabled) {
+      return true; // Polyphony disabled, allow all voices
+    }
+    
+    const currentVoices = this.activeVoices.size;
+    const limit = settings.limit;
+    
+    if (currentVoices < limit) {
+      return true; // Under limit, can play
+    }
+    
+    // At limit, check if voice stealing is enabled
+    if (settings.voiceStealing) {
+      console.log(`AuraSonixEngine: Polyphony limit reached (${currentVoices}/${limit}), will steal voice`);
+      return false; // Will steal voice
+    }
+    
+    console.log(`AuraSonixEngine: Polyphony limit reached (${currentVoices}/${limit}), voice stealing disabled`);
+    return false; // Cannot play
+  }
+
+  // Polyphony management: Steal oldest voice with proper release
+  _stealOldestVoice() {
+    const settings = this._getPolyphonySettings();
+    
+    if (this.activeVoices.size === 0) return;
+    
+    let oldestVoice = null;
+    let oldestTime = Date.now();
+    
+    // Find the oldest voice
+    for (const [noteNumber, voice] of this.activeVoices.entries()) {
+      if (voice.startTime < oldestTime) {
+        oldestTime = voice.startTime;
+        oldestVoice = { noteNumber, voice };
+      }
+    }
+    
+    if (oldestVoice) {
+      const { noteNumber, voice } = oldestVoice;
+      console.log(`AuraSonixEngine: Stealing oldest voice (note ${noteNumber}, started at ${new Date(oldestTime).toISOString()})`);
+      
+      // Apply proper release with ADSR
+      this._releaseVoice(noteNumber, settings.releaseTime);
+    }
+  }
+
+  // Polyphony management: Release voice with proper ADSR
+  _releaseVoice(noteNumber, releaseTime = 0.1) {
+    const voice = this.activeVoices.get(noteNumber);
+    if (!voice) return;
+    
+    try {
+      const { source } = voice;
+      
+      // Apply release envelope
+      if (source._gainNode) {
+        const currentGain = source._gainNode.gain.value;
+        const releaseStart = this.audioCtx.currentTime;
+        const releaseEnd = releaseStart + releaseTime;
+        
+        // Set up release curve
+        source._gainNode.gain.setValueAtTime(currentGain, releaseStart);
+        source._gainNode.gain.linearRampToValueAtTime(0.001, releaseEnd);
+        
+        // Stop the source after release
+        source.stop(releaseEnd + 0.01);
+      } else {
+        // Fallback: immediate stop
+        source.stop();
+      }
+      
+      // Remove from active voices
+      this.activeVoices.delete(noteNumber);
+      
+      console.log(`AuraSonixEngine: Released voice for note ${noteNumber} with ${releaseTime}s release`);
+    } catch (e) {
+      console.warn(`AuraSonixEngine: Failed to release voice for note ${noteNumber}:`, e);
+      // Force remove from active voices
+      this.activeVoices.delete(noteNumber);
+    }
+  }
+
+  // Polyphony management: Add voice to active voices
+  _addVoice(noteNumber, source, velocity) {
+    const voiceId = ++this.voiceCounter;
+    const noteName = this._getNoteName(noteNumber);
+    
+    this.activeVoices.set(noteNumber, {
+      source,
+      startTime: Date.now(),
+      velocity,
+      noteName,
+      voiceId
+    });
+    
+    console.log(`AuraSonixEngine: Added voice ${voiceId} for note ${noteNumber} (${noteName}) at velocity ${velocity}`);
+  }
+
+  // Polyphony management: Remove voice from active voices
+  _removeVoice(noteNumber) {
+    const voice = this.activeVoices.get(noteNumber);
+    if (voice) {
+      console.log(`AuraSonixEngine: Removed voice ${voice.voiceId} for note ${noteNumber} (${voice.noteName})`);
+      this.activeVoices.delete(noteNumber);
+    }
+  }
+
+  // Polyphony monitoring: Get current polyphony stats
+  getPolyphonyStats() {
+    const settings = this._getPolyphonySettings();
+    const activeVoices = Array.from(this.activeVoices.entries()).map(([noteNumber, voice]) => ({
+      noteNumber,
+      noteName: voice.noteName,
+      velocity: voice.velocity,
+      voiceId: voice.voiceId,
+      startTime: voice.startTime,
+      age: Date.now() - voice.startTime
+    }));
+    
+    return {
+      enabled: settings.enabled,
+      limit: settings.limit,
+      currentVoices: this.activeVoices.size,
+      voiceStealing: settings.voiceStealing,
+      stealOldest: settings.stealOldest,
+      releaseTime: settings.releaseTime,
+      activeVoices: activeVoices.sort((a, b) => a.startTime - b.startTime), // Oldest first
+      voiceCounter: this.voiceCounter
+    };
   }
 }
 window.AuraSonixEngine = AuraSonixEngine;

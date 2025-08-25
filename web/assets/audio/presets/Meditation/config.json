@@ -66,6 +66,7 @@
     "sustain": { "enabled": true, "duration": 3.00, "level": 0.90, "infinite": false },
     "randomness": { "enabled": false, "pitchVariation": 0.10, "velocityVariation": 0.20, "timingVariation": 50.0, "sustainVariation": 0.30 },
     "simultaneousNotes": { "enabled": true, "maxNotes": 8, "overlapProbability": 0.30, "voiceStealing": true, "voiceStealThreshold": 0.50 },
+    "polyphony": { "enabled": true, "limit": 12, "voiceStealing": true, "stealOldest": true, "releaseTime": 0.1 },
     "globalVolume": 1.00,
     "audioQuality": "High",
     "layersEnabled": { "bass": true, "mid": true, "high": true, "tex": true }
