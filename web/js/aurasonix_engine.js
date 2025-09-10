@@ -731,15 +731,16 @@ class AuraSonixEngine {
     const rawInputNote = noteNumber; // keep original to stop correctly later
     const presetMap = this.PRESET_CONFIG[this.currentPreset] || {};
 
-    // Apply scale filter: always SNAP to nearest in-scale pitch
+    // Apply pitch quantization: snap to nearest note within the selected scale
     if (cfg && cfg.scaleFilter && cfg.scaleFilter.enabled) {
       // Normalize mode string (uppercase from LAB)
       if (typeof cfg.scaleFilter.mode === 'string') {
         cfg.scaleFilter.mode = cfg.scaleFilter.mode.toLowerCase();
       }
-      const snapped = this._snapNoteToScale(noteNumber, cfg.scaleFilter);
-      if (snapped !== null && Number.isFinite(snapped)) {
-        noteNumber = snapped;
+      const quantized = this._snapNoteToScale(noteNumber, cfg.scaleFilter);
+      if (quantized !== null && Number.isFinite(quantized)) {
+        noteNumber = quantized;
+        console.log(`AuraSonixEngine: pitch quantized from ${rawInputNote} to ${noteNumber}`);
       }
     }
 
@@ -882,12 +883,8 @@ class AuraSonixEngine {
     }
   }
 
-  // Snap incoming note to nearest allowed pitch within scale filter
+  // Pitch quantization: snap incoming note to nearest allowed pitch within scale
   _snapNoteToScale(noteNumber, scaleFilter) {
-    const octave = Math.floor(noteNumber / 12) - 1;
-    if (octave < scaleFilter.minOctave || octave > scaleFilter.maxOctave) {
-      return noteNumber; // keep playing, just don't drop
-    }
     const root = (this._getRootNoteValue(scaleFilter.root || 'C') + 12) % 12;
     const mode = (scaleFilter.mode || 'chromatic').toLowerCase();
     const sets = {
@@ -906,21 +903,46 @@ class AuraSonixEngine {
     const allowed = sets[mode] || sets.chromatic;
     const noteInOct = noteNumber % 12;
     const rel = (noteInOct - root + 12) % 12;
+    
+    // If note is already in scale, return it
     if (allowed.includes(rel)) return noteNumber;
-    // find nearest allowed interval
-    let best = noteNumber; let bestDist = 999;
+    
+    // Find nearest allowed interval within octave range
+    let best = noteNumber; 
+    let bestDist = 999;
+    const minOctave = scaleFilter.minOctave || 0;
+    const maxOctave = scaleFilter.maxOctave || 10;
+    
     for (const step of allowed) {
       const targetRel = (root + step) % 12;
-      // try same octave
-      let cand = noteNumber - rel + step;
-      let d = Math.abs(cand - noteNumber);
-      if (d < bestDist) { best = cand; bestDist = d; }
-      // try neighbouring octaves too
-      cand = noteNumber - rel + step + 12; d = Math.abs(cand - noteNumber);
-      if (d < bestDist) { best = cand; bestDist = d; }
-      cand = noteNumber - rel + step - 12; d = Math.abs(cand - noteNumber);
-      if (d < bestDist) { best = cand; bestDist = d; }
+      
+      // Try octaves within the allowed range
+      for (let oct = minOctave; oct <= maxOctave; oct++) {
+        const cand = oct * 12 + targetRel;
+        const d = Math.abs(cand - noteNumber);
+        if (d < bestDist) { 
+          best = cand; 
+          bestDist = d; 
+        }
+      }
     }
+    
+    // If no valid note found in range, find the closest one outside range
+    if (bestDist === 999) {
+      for (const step of allowed) {
+        const targetRel = (root + step) % 12;
+        // Try same octave
+        let cand = noteNumber - rel + step;
+        let d = Math.abs(cand - noteNumber);
+        if (d < bestDist) { best = cand; bestDist = d; }
+        // Try neighbouring octaves too
+        cand = noteNumber - rel + step + 12; d = Math.abs(cand - noteNumber);
+        if (d < bestDist) { best = cand; bestDist = d; }
+        cand = noteNumber - rel + step - 12; d = Math.abs(cand - noteNumber);
+        if (d < bestDist) { best = cand; bestDist = d; }
+      }
+    }
+    
     return best;
   }
 
