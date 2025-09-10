@@ -60,7 +60,7 @@ class AuraSonixEngine {
     // WebAudio primitives
     this.audioCtx = null;
     this.masterGain = null;
-    this.currentBuffers = { bass: null, mid: null, high: null, tex: null };
+    // No longer needed for synthesizer architecture
     this.activeSources = new Set();
     this.activeByNote = {}; // noteNumber -> Set<AudioBufferSourceNode>
     this.activeByInputNote = {}; // original incoming MIDI note -> Set<AudioBufferSourceNode>
@@ -218,50 +218,7 @@ class AuraSonixEngine {
     console.log("AuraSonixEngine: Device capabilities detected:", capabilities);
   }
 
-  _countAvailableLayers() {
-    let n = 0;
-    if (this.currentBuffers) {
-      for (const k of ['bass','mid','high','tex']) {
-        if (this.currentBuffers[k]) n++;
-      }
-    }
-    return n;
-  }
-
-  _nearestAvailableLayer(preferred) {
-    const order = {
-      bass: ['bass','mid','tex','high'],
-      mid: ['mid','bass','high','tex'],
-      high: ['high','mid','tex','bass'],
-      tex: ['tex','mid','high','bass']
-    };
-    const tryOrder = order[preferred] || ['mid','bass','high','tex'];
-    for (const k of tryOrder) {
-      if (this.currentBuffers && this.currentBuffers[k]) return k;
-    }
-    return preferred;
-  }
-
-  _ensureMinimumLayers() {
-    const have = this._countAvailableLayers();
-    if (!this.currentBuffers) return;
-    if (have >= 3) return;
-    // Duplicate closest sensible layers to reach at least 3
-    const b = this.currentBuffers;
-    // Prefer to seed from mid, then bass, then high, then tex
-    const seed = b.mid || b.bass || b.high || b.tex;
-    if (!b.mid) b.mid = seed;
-    if (this._countAvailableLayers() < 3) {
-      if (!b.bass) b.bass = seed;
-    }
-    if (this._countAvailableLayers() < 3) {
-      if (!b.high) b.high = seed;
-    }
-    if (this._countAvailableLayers() < 3) {
-      if (!b.tex) b.tex = seed;
-    }
-    console.log('AuraSonixEngine: enforced minimum layers, now have', this._countAvailableLayers());
-  }
+  // Layer management methods removed - no longer needed for synthesizer architecture
 
   // Return a serializable snapshot of the current preset configuration
   getCurrentPresetConfig() {
@@ -543,7 +500,6 @@ class AuraSonixEngine {
 
     // Reset any previous state prior to loading
     this.currentPresetConfig = null;
-    this.currentBuffers = { bass: null, mid: null, high: null, tex: null };
 
     try {
       // Try to load config.json for this preset
@@ -600,9 +556,7 @@ class AuraSonixEngine {
       });
 
       await this._ensureAudio();
-      // Load all four buffers; throws if any fail
-      const loaded = await this._loadBuffersForPreset(presetName, preset);
-      this.currentBuffers = loaded;
+      // No need to load buffers for synthesizer architecture
 
       // Only mark preset as current after successful load
       this.currentPreset = presetName;
@@ -827,25 +781,24 @@ class AuraSonixEngine {
     const modeIsChromatic = !!(scaleFilter && typeof scaleFilter.mode === 'string' && scaleFilter.mode.toLowerCase() === 'chromatic');
     const playAllLayers = modeIsChromatic === true;
 
-    // Build list of layers to trigger
+    // Build list of layers to trigger - simplified for synthesizer
     let layersToPlay = [];
     if (playAllLayers) {
+      // Play all enabled layers
       for (const k of ['bass','mid','high','tex']) {
-        if (layersEnabled[k] !== false && this.currentBuffers && this.currentBuffers[k]) {
+        if (layersEnabled[k] !== false) {
           layersToPlay.push(k);
         }
       }
-      // If none available yet, at least try the nearest available from the chosen sampleKey
-      if (layersToPlay.length === 0 && sampleKey) {
-        const alt = this._nearestAvailableLayer(sampleKey);
-        if (this.currentBuffers && this.currentBuffers[alt]) layersToPlay = [alt];
-      }
     } else {
-      // Single-layer behavior as before
+      // Single-layer behavior
       if (!layersEnabled[sampleKey]) {
-        const alt = this._nearestAvailableLayer(sampleKey);
-        if (layersEnabled[alt]) {
-          sampleKey = alt;
+        // Find first enabled layer as fallback
+        for (const k of ['bass','mid','high','tex']) {
+          if (layersEnabled[k] !== false) {
+            sampleKey = k;
+            break;
+          }
         }
       }
       layersToPlay = [sampleKey];
@@ -973,39 +926,50 @@ class AuraSonixEngine {
 
   _playSingleNote(noteNumber, velocity, buffer, playbackRate, gain, cfg, isTexture = false, sampleKey = null) {
     try {
-      // Create oscillator instead of buffer source
-      const oscillator = this.audioCtx.createOscillator();
+      // Create two oscillators for richer sound
+      const oscillator1 = this.audioCtx.createOscillator();
+      const oscillator2 = this.audioCtx.createOscillator();
       
       // Calculate frequency from MIDI note number
       const frequency = this._midiToFrequency(noteNumber);
-      oscillator.frequency.setValueAtTime(frequency, this.audioCtx.currentTime);
+      oscillator1.frequency.setValueAtTime(frequency, this.audioCtx.currentTime);
+      oscillator2.frequency.setValueAtTime(frequency, this.audioCtx.currentTime);
       
       // Set oscillator type based on preset or layer
       const oscillatorType = this._getOscillatorType(sampleKey, cfg);
-      oscillator.type = oscillatorType;
+      oscillator1.type = oscillatorType;
+      oscillator2.type = oscillatorType;
       
       // Apply detune if configured
       const detune = this._getOscillatorDetune(sampleKey, cfg);
       if (detune !== 0) {
-        oscillator.detune.setValueAtTime(detune, this.audioCtx.currentTime);
+        oscillator1.detune.setValueAtTime(detune, this.audioCtx.currentTime);
       }
       
-      // Performance optimization: Add creation timestamp for voice stealing
-      oscillator._creationTime = Date.now();
-      oscillator._startTime = this.audioCtx.currentTime;
+      // Add 7 cents detune to second oscillator for chorus effect
+      oscillator2.detune.setValueAtTime(detune + 7, this.audioCtx.currentTime);
       
-      // Start immediately for better timing
-      oscillator.start();
+      // Performance optimization: Add creation timestamp for voice stealing
+      oscillator1._creationTime = Date.now();
+      oscillator1._startTime = this.audioCtx.currentTime;
+      oscillator2._creationTime = Date.now();
+      oscillator2._startTime = this.audioCtx.currentTime;
+      
+      // Start both oscillators immediately for better timing
+      oscillator1.start();
+      oscillator2.start();
       
       // Reduced logging to improve performance - only log occasionally
       if (Math.random() < 0.05) { // Log only 5% of the time
-        console.log("AuraSonixEngine: playing synth note", {
+        console.log("AuraSonixEngine: playing dual synth note", {
           noteNumber,
           noteName: this._getNoteName(noteNumber),
           frequency: frequency.toFixed(2),
           oscillatorType,
           velocity,
-          presetName: this.currentPreset
+          presetName: this.currentPreset,
+          detune1: detune,
+          detune2: detune + 7
         });
       }
       
@@ -1018,8 +982,9 @@ class AuraSonixEngine {
       filter.frequency.setValueAtTime(filterConfig.frequency, this.audioCtx.currentTime);
       filter.Q.setValueAtTime(filterConfig.Q, this.audioCtx.currentTime);
       
-      // Connect oscillator -> filter -> effects chain
-      oscillator.connect(filter);
+      // Connect both oscillators -> filter -> effects chain
+      oscillator1.connect(filter);
+      oscillator2.connect(filter);
       
       // Apply audio effects chain and get the final node
       const currentEffects = this.currentPresetConfig && this.currentPresetConfig.audioEffects ? this.currentPresetConfig.audioEffects : {};
@@ -1030,7 +995,10 @@ class AuraSonixEngine {
       tailGain.gain.setValueAtTime(1.0, this.audioCtx.currentTime);
       finalNode.connect(tailGain);
       tailGain.connect(this.masterGain);
-      oscillator._gainNode = tailGain;
+      
+      // Store reference to tailGain for both oscillators
+      oscillator1._gainNode = tailGain;
+      oscillator2._gainNode = tailGain;
       
       // Apply sustain settings if enabled
       if (!isTexture) {
@@ -1043,12 +1011,13 @@ class AuraSonixEngine {
             // Schedule a graceful stop with a short fade
             const stopTime = this.audioCtx.currentTime + sustain.duration;
             try {
-              const g = oscillator._gainNode;
+              const g = tailGain;
               if (g) {
                 g.gain.setValueAtTime(g.gain.value, stopTime);
                 g.gain.linearRampToValueAtTime(0.0001, stopTime + 0.08);
               }
-              oscillator.stop(stopTime + 0.1);
+              oscillator1.stop(stopTime + 0.1);
+              oscillator2.stop(stopTime + 0.1);
             } catch (e) {
               console.warn('AuraSonixEngine: failed to schedule stop for sustain:', e);
             }
@@ -1056,38 +1025,50 @@ class AuraSonixEngine {
         }
       }
       
-      // Polyphony management: Add voice to active voices tracking
-      this._addVoice(noteNumber, oscillator, velocity);
+      // Polyphony management: Add voice to active voices tracking (use oscillator1 as primary)
+      this._addVoice(noteNumber, oscillator1, velocity);
       
       // Performance optimization: Track active sources with better cleanup
-      this.activeSources.add(oscillator);
+      this.activeSources.add(oscillator1);
+      this.activeSources.add(oscillator2);
       // Track by note for precise stop
       if (!this.activeByNote[noteNumber]) this.activeByNote[noteNumber] = new Set();
-      this.activeByNote[noteNumber].add(oscillator);
+      this.activeByNote[noteNumber].add(oscillator1);
+      this.activeByNote[noteNumber].add(oscillator2);
       
-      oscillator.onended = () => {
-        // Polyphony management: Remove voice from active voices
-        this._removeVoice(noteNumber);
-        
-        this.activeSources.delete(oscillator);
-        const set = this.activeByNote[noteNumber];
-        if (set) {
-          set.delete(oscillator);
-          if (set.size === 0) delete this.activeByNote[noteNumber];
-        }
-        // Also remove from any activeByInputNote buckets
-        try {
-          for (const key of Object.keys(this.activeByInputNote)) {
-            const s = this.activeByInputNote[key];
-            if (s && s.has(oscillator)) {
-              s.delete(oscillator);
-              if (s.size === 0) delete this.activeByInputNote[key];
-            }
+      // Handle cleanup when either oscillator ends
+      let cleanupCount = 0;
+      const cleanup = () => {
+        cleanupCount++;
+        if (cleanupCount === 2) {
+          // Both oscillators ended, clean up
+          this._removeVoice(noteNumber);
+          this.activeSources.delete(oscillator1);
+          this.activeSources.delete(oscillator2);
+          const set = this.activeByNote[noteNumber];
+          if (set) {
+            set.delete(oscillator1);
+            set.delete(oscillator2);
+            if (set.size === 0) delete this.activeByNote[noteNumber];
           }
-        } catch (_) {}
+          // Also remove from any activeByInputNote buckets
+          try {
+            for (const key of Object.keys(this.activeByInputNote)) {
+              const s = this.activeByInputNote[key];
+              if (s && s.has(oscillator1)) {
+                s.delete(oscillator1);
+                s.delete(oscillator2);
+                if (s.size === 0) delete this.activeByInputNote[key];
+              }
+            }
+          } catch (_) {}
+        }
       };
       
-      return oscillator;
+      oscillator1.onended = cleanup;
+      oscillator2.onended = cleanup;
+      
+      return oscillator1; // Return primary oscillator for compatibility
     } catch (e) {
       console.error('AuraSonixEngine: Failed to play synth note', noteNumber, ':', e);
       return null;
@@ -1442,82 +1423,6 @@ class AuraSonixEngine {
     }
   }
 
-  async _loadBuffersForPreset(presetName, presetMap) {
-    const buffers = {};
-    const audioFiles = {
-      bass: 'bass.wav',
-      mid: 'mid.wav',
-      high: 'high.wav',
-      tex: 'tex.wav'
-    };
-    
-    try {
-      // Try to load real WAV files first
-      for (const [key, filename] of Object.entries(audioFiles)) {
-        const url = `assets/audio/presets/${presetName}/${filename}`;
-        try {
-          console.log(`AuraSonixEngine: loading ${key} from ${url}`);
-          let buffer = await this._loadAudioBuffer(url);
-          
-          // Apply sample rate conversion if needed for mobile
-          if (this.deviceCapabilities.enableSampleRateConversion && buffer.sampleRate !== this.audioCtx.sampleRate) {
-            buffer = this._convertSampleRate(buffer, this.audioCtx.sampleRate);
-          }
-          
-          buffers[key] = buffer;
-          console.log(`AuraSonixEngine: successfully loaded ${key}`);
-        } catch (error) {
-          console.warn(`AuraSonixEngine: failed to load ${key} from ${url}, trying Deep-Focus fallback`, error);
-          // Attempt fallback to Deep-Focus assets to avoid bright dummy
-          try {
-            const altUrl = `assets/audio/presets/Deep-Focus/${filename}`;
-            let buffer = await this._loadAudioBuffer(altUrl);
-            
-            // Apply sample rate conversion if needed
-            if (this.deviceCapabilities.enableSampleRateConversion && buffer.sampleRate !== this.audioCtx.sampleRate) {
-              buffer = this._convertSampleRate(buffer, this.audioCtx.sampleRate);
-            }
-            
-            buffers[key] = buffer;
-            console.log(`AuraSonixEngine: loaded ${key} from fallback ${altUrl}`);
-          } catch (e2) {
-            // Try lowercase of requested preset directory
-            try {
-              const lowerUrl = `assets/audio/presets/${presetName.toLowerCase()}/${filename}`;
-              let buffer = await this._loadAudioBuffer(lowerUrl);
-              
-              // Apply sample rate conversion if needed
-              if (this.deviceCapabilities.enableSampleRateConversion && buffer.sampleRate !== this.audioCtx.sampleRate) {
-                buffer = this._convertSampleRate(buffer, this.audioCtx.sampleRate);
-              }
-              
-              buffers[key] = buffer;
-              console.log(`AuraSonixEngine: loaded ${key} from lowercase path ${lowerUrl}`);
-              continue;
-            } catch (e3) {}
-            // If we already loaded some other layer, reuse it to keep timbre consistent
-            const firstLoaded = buffers.mid || buffers.bass || buffers.high || buffers.tex || null;
-            if (firstLoaded) {
-              buffers[key] = firstLoaded;
-              console.log(`AuraSonixEngine: reused existing buffer for ${key} to maintain tone`);
-            } else {
-              // Last resort: dummy buffer
-              buffers[key] = this._createDummyBuffer(key);
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.warn("AuraSonixEngine: failed to load WAV files, using all dummy buffers:", error);
-      // Fallback to all dummy buffers
-      for (const key of Object.keys(audioFiles)) {
-        buffers[key] = this._createDummyBuffer(key);
-      }
-    }
-    
-    console.log("AuraSonixEngine: loaded buffers for", presetName, Object.keys(buffers));
-    return buffers;
-  }
 
   _createDummyBuffer(layer) {
     const sampleRate = this.audioCtx.sampleRate;
