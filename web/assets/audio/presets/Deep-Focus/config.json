@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 1,
+  "engineVersion": "web-aud-1.0",
+  "name": "Deep Focus",
+  "metadata": { "author": "LiveRoots Lab", "category": "User", "tags": ["example", "ultimate"] },
+
+  "audioFiles": {
+    "bass": "bass.wav",
+    "mid": "mid.wav",
+    "high": "high.wav",
+    "tex": "tex.wav"
+  },
+
+  "defaultZones": [
+    {
+      "name": "Bass",
+      "minNote": 21,
+      "maxNote": 43,
+      "baseNote": "C2",
+      "volume": 0.75,
+      "probability": 0.9,
+      "texture": { "enabled": true, "loop": true, "lfoRateHz": 0.20, "lfoDepth": 0.50 }
+    },
+    {
+      "name": "Mid",
+      "minNote": 44,
+      "maxNote": 67,
+      "baseNote": "C4",
+      "volume": 0.70,
+      "probability": 0.9,
+      "texture": { "enabled": true, "loop": true, "lfoRateHz": 0.20, "lfoDepth": 0.50 }
+    },
+    {
+      "name": "High",
+      "minNote": 68,
+      "maxNote": 87,
+      "baseNote": "C5",
+      "volume": 0.60,
+      "probability": 0.9,
+      "texture": { "enabled": true, "loop": true, "lfoRateHz": 0.20, "lfoDepth": 0.50 }
+    },
+    {
+      "name": "Tex",
+      "minNote": 21,
+      "maxNote": 87,
+      "baseNote": "C3",
+      "volume": 0.50,
+      "probability": 0.9,
+      "texture": { "enabled": true, "loop": true, "lfoRateHz": 0.20, "lfoDepth": 0.50 }
+    }
+  ],
+
+  "defaultScaleFilter": {
+    "enabled": true,
+    "root": "C",
+    "mode": "PENTATONIC_MAJOR",
+    "minOctave": 1,
+    "maxOctave": 7,
+    "behavior": "snap"
+  },
+
+  "defaultAudioEffects": {
+    "reverb": { "enabled": true, "wet": 0.35, "dry": 0.65, "roomSize": 0.60, "dampening": 0.75, "preDelay": 0.01 },
+    "filter": { "enabled": false, "type": "lpf", "cutoff": 2000.0, "resonance": 0.0 },
+    "envelope": { "enabled": true, "attack": 0.08, "decay": 0.15, "sustain": 0.85, "release": 0.60 },
+    "sustain": { "enabled": true, "duration": 2.00, "level": 0.80, "infinite": false },
+    "randomness": { "enabled": false, "pitchVariation": 0.02, "velocityVariation": 0.10, "timingVariation": 20.0, "sustainVariation": 0.15 },
+    "simultaneousNotes": { "enabled": true, "maxNotes": 6, "overlapProbability": 0.25, "voiceStealing": true, "voiceStealThreshold": 0.50 },
+    "polyphony": { "enabled": true, "limit": 8, "voiceStealing": true, "stealOldest": true, "releaseTime": 0.12 },
+    "oscillator": {
+      "enabled": true,
+      "type": "sine",
+      "detune": 0,
+      "harmonicContent": 0.5,
+      "filter": { "frequency": 1000, "Q": 0.6 },
+      "lfo": { "rate": 0.5, "depth": 300 },
+      "layers": {
+        "bass": {
+          "type": "sawtooth",
+          "detune": -3,
+          "harmonicContent": 0.8,
+          "filter": { "frequency": 600, "Q": 0.4 },
+          "lfo": { "rate": 0.3, "depth": 200 }
+        },
+        "mid": {
+          "type": "triangle",
+          "detune": 0,
+          "harmonicContent": 0.5,
+          "filter": { "frequency": 1000, "Q": 0.6 },
+          "lfo": { "rate": 0.5, "depth": 300 }
+        },
+        "high": {
+          "type": "sine",
+          "detune": 3,
+          "harmonicContent": 0.3,
+          "filter": { "frequency": 1800, "Q": 0.2 },
+          "lfo": { "rate": 0.8, "depth": 150 }
+        },
+        "tex": {
+          "type": "square",
+          "detune": 0,
+          "harmonicContent": 0.7,
+          "filter": { "frequency": 1200, "Q": 0.7 },
+          "lfo": { "rate": 1.2, "depth": 400 }
+        }
+      }
+    },
+    "globalVolume": 1.00,
+    "audioQuality": "High",
+    "layersEnabled": { "bass": true, "mid": true, "high": true, "tex": true }
+  },
+
+  "defaultMidiRules": {
+    "velocityRule": { "enabled": false, "minVelocity": 0.0, "maxVelocity": 1.0, "curve": "linear" },
+    "noteTransformation": { "enabled": false, "transpose": 0, "octaveShift": 0.0, "harmonize": false, "harmonyIntervals": [0, 7, 12] },
+    "arpeggiator": { "enabled": false, "pattern": "up", "rate": 8.0, "octaves": 1, "syncToTempo": false, "gateLength": 0.5 },
+    "quantization": { "enabled": false, "grid": "1/16", "strength": 0.8, "swing": false, "swingAmount": 0.5 },
+    "midiThru": false,
+    "recordMidi": false
+  },
+
+  "configSource": "exported from lab",
+  "configName": "config.json"
+}

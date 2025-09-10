@@ -1,53 +1,137 @@
 {
-    "version": 1,
-    "presetName": "Creative-Flow",
-    "description": "Un preset diseñado para inspirar la creatividad con un toque etéreo.",
-    "globalVolume": 0.9,
-    "layerVolumes": {
-      "bass": 0.85,
-      "mid": 0.75,
-      "high": 0.8,
-      "tex": 1.0
+  "name": "Deep-Focus",
+  "description": "Deep Focus preset optimized for concentration and productivity",
+  "version": "2.0.0",
+  "metadata": {
+    "author": "AuraSonix",
+    "category": "Productivity",
+    "tags": ["focus", "deep-work", "ambient"]
+  },
+  "audioFiles": {
+    "bass": "bass.wav",
+    "mid": "mid.wav",
+    "high": "high.wav",
+    "tex": "tex.wav"
+  },
+  "defaultZones": [
+    {
+      "name": "Bass",
+      "minNote": 24,
+      "maxNote": 47,
+      "baseNote": "C2",
+      "volume": 0.8,
+      "probability": 0.9
     },
-    "midiConfig": {
-      "scaleFilter": {
-        "enabled": true,
-        "scale": "pentatonic_major",
-        "rootNote": "C"
-      }
+    {
+      "name": "Mid",
+      "minNote": 48,
+      "maxNote": 71,
+      "baseNote": "C4",
+      "volume": 0.7,
+      "probability": 0.8
     },
-    "effectsChain": [
-      {
-        "id": "main-envelope",
-        "type": "Envelope",
-        "enabled": true,
-        "parameters": {
-          "attack": 0.01,
-          "decay": 0.1,
-          "sustain": 0.8,
-          "release": 0.3
-        }
-      },
-      {
-        "id": "reverb-main",
-        "type": "Reverb",
-        "enabled": true,
-        "parameters": {
-          "wet": 0.3,
-          "roomSize": 0.7,
-          "damping": 0.5
-        }
-      },
-      {
-        "id": "delay-pingpong",
-        "type": "Delay",
-        "enabled": false,
-        "parameters": {
-          "time": "4n",
-          "feedback": 0.4,
-          "wet": 0.25
-        }
-      }
-    ]
+    {
+      "name": "High",
+      "minNote": 72,
+      "maxNote": 95,
+      "baseNote": "C5",
+      "volume": 0.6,
+      "probability": 0.7
+    },
+    {
+      "name": "Tex",
+      "minNote": 36,
+      "maxNote": 83,
+      "baseNote": "C3",
+      "volume": 0.5,
+      "probability": 0.6
+    }
+  ],
+  "defaultScaleFilter": {
+    "enabled": false,
+    "root": "C",
+    "mode": "chromatic",
+    "minOctave": 1,
+    "maxOctave": 8
+  },
+  "defaultAudioEffects": {
+    "reverb": {
+      "enabled": true,
+      "wet": 0.4,
+      "dry": 0.6,
+      "roomSize": 0.7,
+      "dampening": 0.6,
+      "preDelay": 0.02
+    },
+    "filter": {
+      "enabled": false,
+      "cutoff": 4000.0,
+      "resonance": 0.0,
+      "type": "lpf"
+    },
+    "envelope": {
+      "enabled": true,
+      "attack": 0.05,
+      "decay": 0.1,
+      "sustain": 0.9,
+      "release": 2.0
+    },
+    "sustain": {
+      "enabled": true,
+      "duration": 5.0,
+      "level": 0.85,
+      "infinite": false
+    },
+    "randomness": {
+      "enabled": false,
+      "pitchVariation": 0.05,
+      "velocityVariation": 0.1,
+      "timingVariation": 20.0,
+      "sustainVariation": 0.1
+    },
+    "simultaneousNotes": {
+      "enabled": true,
+      "maxNotes": 6,
+      "overlapProbability": 0.4,
+      "voiceStealing": true,
+      "voiceStealThreshold": 0.6
+    },
+    "globalVolume": 1.2,
+    "audioQuality": "High"
+  },
+  "defaultMidiRules": {
+    "velocityMapping": {
+      "enabled": true,
+      "minVelocity": 0.4,
+      "maxVelocity": 1.0,
+      "curve": "exponential"
+    },
+    "noteTransformation": {
+      "enabled": false,
+      "transpose": 0,
+      "octaveShift": 0,
+      "harmonization": "none"
+    },
+    "arpeggiator": {
+      "enabled": false,
+      "pattern": "up",
+      "rate": 0.5,
+      "octaves": 1
+    },
+    "quantization": {
+      "enabled": false,
+      "grid": "1/4",
+      "strength": 0.5
+    },
+    "randomness": {
+      "enabled": false,
+      "amount": 0.05,
+      "type": "note"
+    },
+    "simultaneousNotes": {
+      "enabled": true,
+      "maxNotes": 6,
+      "voiceStealing": true
+    }
   }
-  
+}

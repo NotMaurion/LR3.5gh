@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'engine_selector.dart';
 import '../services/storage_service.dart';
 import '../state/lab_unlock_notifier.dart';
+import 'audio_engine.dart';
 
-final audioEngineProvider = Provider<Object>((ref) {
+final audioEngineProvider = Provider<AudioEngine>((ref) {
   final engine = createEngine();
   return engine;
 });

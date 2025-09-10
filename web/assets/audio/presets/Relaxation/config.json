@@ -1,0 +1,145 @@
+{
+  "metadata": {
+    "name": "Relaxation",
+    "description": "Un preset diseñado para relajación profunda y reducción del estrés. Sonidos suaves y envolventes que promueven la calma y la paz interior.",
+    "version": "1.0.0",
+    "author": "LiveRoots",
+    "category": "Wellness",
+    "tags": ["relaxation", "calm", "stress-relief", "peaceful", "soothing"]
+  },
+  "audioFiles": {
+    "bass": "bass.wav",
+    "mid": "mid.wav", 
+    "high": "high.wav",
+    "tex": "tex.wav"
+  },
+  "defaultZones": [
+    {
+      "name": "Bass",
+      "minNote": 21,
+      "maxNote": 43,
+      "baseNote": "C2",
+      "volume": 0.6,
+      "probability": 0.6,
+      "description": "Bajos suaves para estabilidad y calma"
+    },
+    {
+      "name": "Mid", 
+      "minNote": 44,
+      "maxNote": 67,
+      "baseNote": "C4",
+      "volume": 0.5,
+      "probability": 0.5,
+      "description": "Medios gentiles para melodías relajantes"
+    },
+    {
+      "name": "High",
+      "minNote": 68,
+      "maxNote": 87,
+      "baseNote": "C5", 
+      "volume": 0.4,
+      "probability": 0.4,
+      "description": "Agudos suaves para texturas etéreas"
+    },
+    {
+      "name": "Tex",
+      "minNote": 21,
+      "maxNote": 108,
+      "baseNote": "C3",
+      "volume": 0.3,
+      "probability": 0.3,
+      "description": "Textura sutil para ambiente envolvente con rango amplio"
+    }
+  ],
+  "defaultScaleFilter": {
+    "enabled": true,
+    "root": "C",
+    "mode": "pentatonic_major",
+    "minOctave": 2,
+    "maxOctave": 5,
+    "description": "Escala pentatónica mayor para serenidad"
+  },
+  "defaultAudioEffects": {
+    "reverb": {
+      "enabled": true,
+      "wet": 0.9,
+      "dry": 0.1,
+      "roomSize": 0.98,
+      "dampening": 0.9,
+      "preDelay": 0.1,
+      "description": "Reverb de hall muy espacioso para ambiente etéreo"
+    },
+    "filter": {
+      "enabled": true,
+      "cutoff": 3000.0,
+      "resonance": 0.2,
+      "type": "lpf",
+      "description": "Filtro suave para sonidos más cálidos"
+    },
+    "envelope": {
+      "enabled": true,
+      "attack": 0.3,
+      "decay": 0.5,
+      "sustain": 0.95,
+      "release": 3.0,
+      "description": "Envelope muy suave para transiciones lentas"
+    },
+    "sustain": {
+      "enabled": true,
+      "duration": 1.0,
+      "level": 0.98,
+      "infinite": false,
+      "description": "Sustain de 1 segundo para sonidos largos"
+    },
+    "globalVolume": 0.7,
+    "audioQuality": "High"
+  },
+  "defaultMidiRules": {
+    "velocityMapping": {
+      "enabled": true,
+      "minVelocity": 0.4,
+      "maxVelocity": 0.8,
+      "curve": "logarithmic",
+      "description": "Mapeo de velocidad suave y controlado"
+    },
+    "noteTransformation": {
+      "enabled": false,
+      "transpose": 0,
+      "octaveShift": 0,
+      "harmonization": "none",
+      "description": "Sin transformación para simplicidad"
+    },
+    "arpeggiator": {
+      "enabled": false,
+      "pattern": "up",
+      "rate": 0.5,
+      "octaves": 1,
+      "description": "Arpeggiator deshabilitado"
+    },
+    "quantization": {
+      "enabled": false,
+      "grid": "1/4",
+      "strength": 0.5,
+      "description": "Sin cuantización para fluidez natural"
+    },
+    "randomness": {
+      "enabled": true,
+      "amount": 0.2,
+      "type": "note",
+      "description": "Aleatoriedad sutil para organicidad"
+    },
+    "simultaneousNotes": {
+      "enabled": true,
+      "maxNotes": 4,
+      "voiceStealing": false,
+      "description": "Pocas notas simultáneas para simplicidad"
+    }
+  },
+  "presetSpecifics": {
+    "intendedUse": "Relaxation, stress relief, meditation preparation",
+    "mood": "Calm, peaceful, serene",
+    "energyLevel": "Low",
+    "complexity": "Low",
+    "recommendedDuration": "20-60 minutes"
+  }
+}

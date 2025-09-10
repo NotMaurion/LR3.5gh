@@ -140,7 +140,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               child: GestureDetector(
                 onTap: _onLogoTap,
                 child: Image.asset(
-                  'assets/images/LiveRootsLogo.png',
+                  'assets/images/Logo-App-Live-Roots-Lab.png',
                   width: MediaQuery.of(context).size.width * 0.5,
                 ),
               ),

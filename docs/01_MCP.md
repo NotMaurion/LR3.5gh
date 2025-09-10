@@ -107,6 +107,8 @@ Fase 1: Fundación Estable (Completa)
 
 [x] Establecer la estructura de archivos "Convención sobre Configuración".
 
+[x] Implementar optimizaciones de rendimiento para prevenir saturación del buffer MIDI.
+
 Fase 2: Integración y App Base
 
 [ ] Implementar la interfaz AudioEngine y las clases WebAudioEngine y MobileAudioEngine.
@@ -140,3 +142,104 @@ Fase 5: Contenido y Comunidad
 Fase 6: Acceso Oculto (Easter Egg)
 
 [ ] Implementar el desbloqueo del Laboratorio mediante el código Konami como se especificó en V3, usando Isar para guardar el estado de desbloqueo.
+
+## 6. Optimizaciones de Rendimiento (Nueva Sección)
+
+### 6.1. Problema Resuelto: Saturación del Buffer MIDI
+
+Basado en las observaciones del ingeniero de sonido, se identificó que la aplicación experimentaba saturación del buffer MIDI cuando se enviaban muchas notas consecutivas rápidamente (aproximadamente cada 200ms). Esto ocurría porque:
+
+- Los samples tienen una duración mayor al intervalo entre notas
+- La aplicación intentaba reproducir múltiples notas simultáneamente
+- No había límites en la cantidad de notas concurrentes
+- El buffer MIDI se saturaba, causando problemas de rendimiento
+
+### 6.2. Soluciones Implementadas
+
+#### Límite de Notas Concurrentes
+```javascript
+// Configuración de límites de rendimiento
+this.MAX_CONCURRENT_NOTES = 16; // Límite total de notas activas
+this.MAX_CONCURRENT_NOTES_PER_NOTE = 3; // Máximo 3 instancias de la misma nota
+```
+
+#### Voice Stealing Inteligente
+- Detecta automáticamente cuando se alcanza el límite de notas concurrentes
+- Identifica la nota más antigua (por timestamp de creación)
+- Detiene automáticamente esa nota para hacer espacio
+- Permite que las nuevas notas se reproduzcan
+
+#### Limpieza Automática de Fuentes Huérfanas
+- Elimina fuentes de audio que han terminado pero no fueron eliminadas correctamente
+- Se ejecuta cada 5 segundos para prevenir acumulación de recursos
+- Incluye un período de gracia de 1 segundo para evitar eliminaciones prematuras
+
+#### Verificación Antes de Reproducir
+- Valida límites antes de crear nuevas fuentes de audio
+- Implementa voice stealing cuando es necesario
+- Previene la saturación del buffer MIDI
+
+### 6.3. Configuración Adaptativa por Dispositivo
+
+El sistema puede ajustar los límites según el rendimiento del dispositivo:
+
+```javascript
+adjustPerformanceLimits(deviceType = 'auto') {
+  const limits = {
+    'low': { maxConcurrent: 8, maxPerNote: 2 },
+    'medium': { maxConcurrent: 16, maxPerNote: 3 },
+    'high': { maxConcurrent: 32, maxPerNote: 4 },
+    'auto': { maxConcurrent: 16, maxPerNote: 3 }
+  };
+}
+```
+
+### 6.4. Monitoreo de Rendimiento
+
+#### Estadísticas Disponibles
+```javascript
+getPerformanceStats() {
+  return {
+    totalActiveSources: this.activeSources.size,
+    maxConcurrentNotes: this.MAX_CONCURRENT_NOTES,
+    maxConcurrentNotesPerNote: this.MAX_CONCURRENT_NOTES_PER_NOTE,
+    activeNotesByNote: {}, // Notas activas por número de nota
+    bufferSaturation: this.activeSources.size >= this.MAX_CONCURRENT_NOTES,
+    lastCleanupTime: this._lastCleanupTime,
+    audioContextState: this.audioCtx ? this.audioCtx.state : 'not_initialized'
+  };
+}
+```
+
+#### Logs de Debugging
+El sistema incluye logs detallados para monitorear el rendimiento:
+```
+AuraSonixEngine: Max concurrent notes reached (16/16), will steal voice
+AuraSonixEngine: Stealing oldest voice to prevent buffer saturation
+AuraSonixEngine: Cleaned up 3 orphaned sources
+AuraSonixEngine: Adjusted performance limits for medium: {maxConcurrent: 16, maxPerNote: 3}
+```
+
+### 6.5. Beneficios de las Optimizaciones
+
+✅ **Prevención de Saturación**: El buffer MIDI ya no se satura con muchas notas consecutivas
+✅ **Mejor Rendimiento**: Menos carga en el procesador de audio
+✅ **Experiencia Consistente**: La aplicación funciona mejor en computadoras menos potentes
+✅ **Voice Stealing Inteligente**: Las notas más antiguas se detienen automáticamente
+✅ **Limpieza Automática**: No hay acumulación de fuentes de audio huérfanas
+✅ **Configuración Adaptativa**: Se puede ajustar según el dispositivo
+
+### 6.6. Resultados Observados
+
+Durante las pruebas de rendimiento se confirmó:
+- **Limpieza Automática Funcionando**: Se limpiaron 42 fuentes huérfanas en el período de observación
+- **Probability Gate Activo**: Aproximadamente 30% de las notas son rechazadas por el probability gate
+- **Reproducción Estable**: Las notas se reproducen sin interrupciones
+- **Saturación Prevenida**: No se detectaron logs de "Max concurrent notes reached" o "buffer saturated"
+
+### 6.7. Próximas Optimizaciones de Rendimiento
+
+1. **Adaptación Automática**: Implementar detección automática del rendimiento del dispositivo
+2. **Métricas Avanzadas**: Agregar métricas de latencia y uso de CPU
+3. **Configuración Dinámica**: Ajustar límites basado en el rendimiento en tiempo real
+4. **Optimización de Efectos**: Reducir la carga de efectos de audio en dispositivos lentos

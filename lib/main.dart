@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'theme/app_theme.dart';
 import 'widgets/styled_preset_button.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +7,11 @@ import 'audio/audio_providers.dart';
 import 'ui/lab_screen.dart';
 import 'ui/settings_screen.dart';
 import 'services/storage_service.dart';
+import 'state/active_preset_provider.dart';
+import 'state/audio_effects_state.dart';
+import 'state/scale_filter_state.dart';
+import 'state/zones_state.dart';
+import 'state/midi_rules_state.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,15 +51,171 @@ class PlayerScreen extends ConsumerStatefulWidget {
 class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   bool _initializing = false;
   bool _initialized = false;
+  bool _loadingPreset = false;
+  String? _loadingPresetName;
+  Timer? _sleepTimer;
+  DateTime? _sleepEndsAt;
 
   Future<void> _ensureInit(Object engine) async {
     if (_initialized || _initializing) return;
     setState(() => _initializing = true);
     await (engine as dynamic).init();
+    // After engine init, push current LAB state immediately so sound matches LAB from the start
+    try {
+      final effects = ref.read(audioEffectsProvider).toMap();
+      // Ensure filter.enabled defaults to false unless explicitly set
+      if (effects['filter'] is Map && (effects['filter']['enabled'] == null)) {
+        effects['filter']['enabled'] = false;
+      }
+      final scale = ref.read(scaleFilterProvider).toJson();
+      final zones = ref.read(zonesProvider).map((z) => z.toMap()).toList();
+      final midi = ref.read(midiRulesProvider).toMap();
+
+      (engine as dynamic).updateAudioEffects(effects);
+      (engine as dynamic).updateScaleFilterConfig(scale);
+      (engine as dynamic).updateZonesConfig(zones);
+      (engine as dynamic).updateMidiRules(midi);
+    } catch (_) {}
     setState(() {
       _initializing = false;
       _initialized = true;
     });
+  }
+
+  Future<void> _loadPresetWithInit(Object engine, String presetName) async {
+    if (_loadingPreset) return; // Prevent multiple simultaneous loads
+    
+    setState(() {
+      _loadingPreset = true;
+      _loadingPresetName = presetName;
+    });
+
+    try {
+      // First ensure the engine is initialized
+      await _ensureInit(engine);
+      
+      // Set active preset immediately for UI feedback
+      ref.read(activePresetProvider.notifier).setActivePreset(presetName);
+      print('Active preset set to: $presetName');
+      
+      // Now load the preset
+      // ignore: avoid_dynamic_calls
+      final ok = await (engine as dynamic).loadPreset(presetName) as bool;
+      if (ok) {
+        print('Preset loaded successfully: $presetName');
+        // Ensure LAB processing is re-applied right after preset load
+        try {
+          final effects = ref.read(audioEffectsProvider).toMap();
+          final scale = ref.read(scaleFilterProvider).toJson();
+          final zones = ref.read(zonesProvider).map((z) => z.toMap()).toList();
+          final midi = ref.read(midiRulesProvider).toMap();
+          (engine as dynamic).updateAudioEffects(effects);
+          (engine as dynamic).updateScaleFilterConfig(scale);
+          (engine as dynamic).updateZonesConfig(zones);
+          (engine as dynamic).updateMidiRules(midi);
+        } catch (_) {}
+      } else {
+        print('Failed to load preset: $presetName');
+        // Reset active preset if loading failed
+        ref.read(activePresetProvider.notifier).clearActivePreset();
+      }
+    } catch (e) {
+      print('Error loading preset $presetName: $e');
+      // Reset active preset if loading failed
+      ref.read(activePresetProvider.notifier).clearActivePreset();
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingPreset = false;
+          _loadingPresetName = null;
+        });
+      }
+    }
+  }
+
+  void _showTimerSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF0F0F1A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Sleep timer', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                children: [
+                  _TimerChip(label: '15m', minutes: 15, onSelect: _startSleepTimer),
+                  _TimerChip(label: '30m', minutes: 30, onSelect: _startSleepTimer),
+                  _TimerChip(label: '45m', minutes: 45, onSelect: _startSleepTimer),
+                  _TimerChip(label: '60m', minutes: 60, onSelect: _startSleepTimer),
+                  _TimerChip(label: 'Cancel', minutes: 0, onSelect: (_) => _cancelSleepTimer()),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (_sleepEndsAt != null)
+                Text('Ends in ${_formatRemaining()}', style: const TextStyle(color: Colors.white70)),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _startSleepTimer(int minutes) {
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    if (minutes <= 0) {
+      _cancelSleepTimer();
+      return;
+    }
+    _sleepTimer?.cancel();
+    _sleepEndsAt = DateTime.now().add(Duration(minutes: minutes));
+    _sleepTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (_sleepEndsAt == null) return;
+      if (DateTime.now().isAfter(_sleepEndsAt!)) {
+        _cancelSleepTimer();
+        // Stop engine
+        final engine = ref.read(audioEngineProvider);
+        (engine as dynamic).stopAll();
+      } else {
+        setState(() {});
+      }
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Timer set for ${minutes}m'),
+        duration: const Duration(milliseconds: 1200),
+      ),
+    );
+  }
+
+  void _cancelSleepTimer({bool showSnackBar = true}) {
+    _sleepTimer?.cancel();
+    _sleepTimer = null;
+    _sleepEndsAt = null;
+    if (showSnackBar && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Timer canceled'), duration: Duration(milliseconds: 1000)),
+      );
+    }
+    setState(() {});
+  }
+
+  String _formatRemaining() {
+    if (_sleepEndsAt == null) return '';
+    final diff = _sleepEndsAt!.difference(DateTime.now());
+    final m = diff.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = diff.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$m:$s';
   }
 
   @override
@@ -62,6 +224,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     const accent = Color(0xFF10D38F);
     final size = MediaQuery.of(context).size;
     final engine = ref.watch(audioEngineProvider);
+    // Prime the engine with Lab defaults so sound matches LAB immediately
+    // Reading these providers triggers their notifiers to push initial configs
+    ref.watch(audioEffectsProvider);
+    ref.watch(scaleFilterProvider);
+    ref.watch(zonesProvider);
+    ref.watch(midiRulesProvider);
     return Scaffold(
       backgroundColor: background,
       appBar: AppBar(
@@ -79,6 +247,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
               },
             ),
           IconButton(
+            tooltip: 'Settings',
             icon: const Icon(Icons.settings),
             onPressed: () {
               Navigator.of(context).push(
@@ -109,15 +278,27 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                 ),
               ),
 
-              if (_initializing)
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: CircularProgressIndicator(),
+              if (_initializing || _loadingPreset)
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      const CircularProgressIndicator(),
+                      if (_loadingPreset && _loadingPresetName != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            'Loading ${_loadingPresetName!.replaceAll('-', ' ')}...',
+                            style: const TextStyle(color: Colors.white70),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               _PresetList(
-                presets: const ['Creative-Flow', 'Deep-Focus', 'Relaxation', 'Night-Drive'],
+                presets: const ['Deep-Focus', 'Creative-Flow', 'Relaxation', 'Night-Drive', 'Meditation', 'Study', 'Workout'],
                 engine: engine,
-                onAnyPress: () => _ensureInit(engine),
+                onPresetPress: _loadPresetWithInit,
               ),
 
               SizedBox(height: size.height * 0.12),
@@ -126,7 +307,30 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const _CircleControl(icon: Icons.timer_outlined),
+                  GestureDetector(
+                    onTap: _showTimerSheet,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        const _CircleControl(icon: Icons.timer_outlined),
+                        if (_sleepEndsAt != null)
+                          Positioned(
+                            bottom: 10,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10D38F).withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                _formatRemaining(),
+                                style: const TextStyle(color: Colors.white70, fontSize: 10),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(width: 32),
                   GestureDetector(
                     onTap: () async {
@@ -140,6 +344,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                     onTap: () async {
                       await _ensureInit(engine);
                       (engine as dynamic).stopAll();
+                      // Cancel any active sleep timer
+                      _cancelSleepTimer(showSnackBar: false);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Stopped'),
+                            duration: Duration(milliseconds: 800),
+                          ),
+                        );
+                      }
                     },
                     child: const _CircleControl(icon: Icons.stop_rounded),
                   ),
@@ -153,32 +367,78 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   }
 }
 
-class _PresetList extends StatefulWidget {
-  const _PresetList({required this.presets, required this.engine, required this.onAnyPress});
+class _PresetList extends ConsumerStatefulWidget {
+  const _PresetList({
+    required this.presets, 
+    required this.engine, 
+    required this.onPresetPress,
+  });
   final List<String> presets;
   final Object engine;
-  final Future<void> Function() onAnyPress;
+  final Future<void> Function(Object engine, String presetName) onPresetPress;
 
   @override
-  State<_PresetList> createState() => _PresetListState();
+  ConsumerState<_PresetList> createState() => _PresetListState();
 }
 
-class _PresetListState extends State<_PresetList> {
-  String? _active;
+class _PresetListState extends ConsumerState<_PresetList> {
+  String? _activePreset;
+
+  @override
+  void initState() {
+    super.initState();
+    // Set the first preset as active immediately
+    if (widget.presets.isNotEmpty) {
+      _activePreset = widget.presets.first;
+    }
+    // Load the first preset by default
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (widget.presets.isNotEmpty) {
+        await widget.onPresetPress(widget.engine, widget.presets.first);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    // Watch the active preset from the provider
+    final activePresetFromProvider = ref.watch(activePresetProvider);
+    print('Current active preset (provider): $activePresetFromProvider');
+    
     return Column(
       children: [
         for (final p in widget.presets) ...[
           StyledPresetButton(
             label: p.replaceAll('-', ' '),
-            isActive: _active == p,
+            isActive: activePresetFromProvider == p,
+            comingSoon: const {
+              'Night-Drive': true,
+              'Relaxation': true,
+              'Study': true,
+              'Workout': true,
+            }[p] == true,
             onPressed: () async {
-              await widget.onAnyPress();
-              // ignore: avoid_dynamic_calls
-              final ok = await (widget.engine as dynamic).loadPreset(p) as bool;
-              if (ok) setState(() => _active = p);
+              if (const {
+                'Night-Drive': true,
+                'Relaxation': true,
+                'Study': true,
+                'Workout': true,
+              }[p] == true) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    backgroundColor: Color(0xFF0F0F1A),
+                    content: Text(
+                      'Coming soon',
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                    duration: Duration(milliseconds: 1200),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+                return;
+              }
+              print('Button pressed for preset: $p');
+              await widget.onPresetPress(widget.engine, p);
             },
           ),
           const SizedBox(height: 12),
@@ -211,6 +471,27 @@ class _CircleControl extends StatelessWidget {
         ],
       ),
       child: Icon(icon, size: 32, color: iconColor),
+    );
+  }
+}
+
+class _TimerChip extends StatelessWidget {
+  const _TimerChip({required this.label, required this.minutes, required this.onSelect});
+  final String label;
+  final int minutes;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return ElevatedButton(
+      onPressed: () => onSelect(minutes),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFF10D38F),
+        foregroundColor: const Color(0xFF0B2D24),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      ),
+      child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
     );
   }
 }

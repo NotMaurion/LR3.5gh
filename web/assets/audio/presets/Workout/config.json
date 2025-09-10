@@ -1,0 +1,145 @@
+{
+  "metadata": {
+    "name": "Workout",
+    "description": "Un preset diseñado para entrenamientos intensos y motivación física. Sonidos energéticos y rítmicos que impulsan el rendimiento y la energía.",
+    "version": "1.0.0",
+    "author": "LiveRoots",
+    "category": "Fitness",
+    "tags": ["workout", "fitness", "energy", "motivation", "rhythmic", "intense"]
+  },
+  "audioFiles": {
+    "bass": "bass.wav",
+    "mid": "mid.wav", 
+    "high": "high.wav",
+    "tex": "tex.wav"
+  },
+  "defaultZones": [
+    {
+      "name": "Bass",
+      "minNote": 21,
+      "maxNote": 43,
+      "baseNote": "C2",
+      "volume": 1.0,
+      "probability": 0.9,
+      "description": "Bajos potentes para energía y ritmo"
+    },
+    {
+      "name": "Mid", 
+      "minNote": 44,
+      "maxNote": 67,
+      "baseNote": "C4",
+      "volume": 0.8,
+      "probability": 0.8,
+      "description": "Medios energéticos para melodías motivadoras"
+    },
+    {
+      "name": "High",
+      "minNote": 68,
+      "maxNote": 87,
+      "baseNote": "C5", 
+      "volume": 0.7,
+      "probability": 0.7,
+      "description": "Agudos brillantes para intensidad"
+    },
+    {
+      "name": "Tex",
+      "minNote": 21,
+      "maxNote": 108,
+      "baseNote": "C3",
+      "volume": 0.6,
+      "probability": 0.6,
+      "description": "Textura rítmica para movimiento con rango amplio"
+    }
+  ],
+  "defaultScaleFilter": {
+    "enabled": true,
+    "root": "C",
+    "mode": "pentatonic_major",
+    "minOctave": 1,
+    "maxOctave": 7,
+    "description": "Escala pentatónica mayor para máxima energía"
+  },
+  "defaultAudioEffects": {
+    "reverb": {
+      "enabled": true,
+      "wet": 0.3,
+      "dry": 0.7,
+      "roomSize": 0.6,
+      "dampening": 0.5,
+      "preDelay": 0.01,
+      "description": "Reverb de hall mínimo para claridad y punch"
+    },
+    "filter": {
+      "enabled": false,
+      "cutoff": 2000.0,
+      "resonance": 0.0,
+      "type": "lpf",
+      "description": "Filtro deshabilitado para máxima presencia"
+    },
+    "envelope": {
+      "enabled": true,
+      "attack": 0.01,
+      "decay": 0.05,
+      "sustain": 0.9,
+      "release": 0.8,
+      "description": "Envelope rápido para respuesta inmediata"
+    },
+    "sustain": {
+      "enabled": true,
+      "duration": 1.0,
+      "level": 0.95,
+      "infinite": false,
+      "description": "Sustain de 1 segundo para sonidos largos"
+    },
+    "globalVolume": 1.3,
+    "audioQuality": "High"
+  },
+  "defaultMidiRules": {
+    "velocityMapping": {
+      "enabled": true,
+      "minVelocity": 0.6,
+      "maxVelocity": 1.0,
+      "curve": "exponential",
+      "description": "Mapeo de velocidad potente para energía"
+    },
+    "noteTransformation": {
+      "enabled": false,
+      "transpose": 0,
+      "octaveShift": 0,
+      "harmonization": "none",
+      "description": "Sin transformación para control directo"
+    },
+    "arpeggiator": {
+      "enabled": false,
+      "pattern": "up",
+      "rate": 0.5,
+      "octaves": 1,
+      "description": "Arpeggiator deshabilitado"
+    },
+    "quantization": {
+      "enabled": true,
+      "grid": "1/16",
+      "strength": 0.9,
+      "description": "Cuantización fuerte para ritmo preciso"
+    },
+    "randomness": {
+      "enabled": false,
+      "amount": 0.1,
+      "type": "note",
+      "description": "Sin aleatoriedad para consistencia rítmica"
+    },
+    "simultaneousNotes": {
+      "enabled": true,
+      "maxNotes": 16,
+      "voiceStealing": true,
+      "description": "Muchas notas simultáneas para intensidad"
+    }
+  },
+  "presetSpecifics": {
+    "intendedUse": "Workout sessions, fitness training, motivation",
+    "mood": "Energetic, powerful, motivating",
+    "energyLevel": "Very High",
+    "complexity": "High",
+    "recommendedDuration": "20-60 minutes"
+  }
+}

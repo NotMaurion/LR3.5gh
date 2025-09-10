@@ -1,39 +1,26 @@
-import 'package:isar/isar.dart';
-import '../data/app_settings.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class StorageService {
   static const String _labUnlockedKey = 'isLabUnlocked';
   
-  late Isar _isar;
+  late SharedPreferences _prefs;
   bool _isInitialized = false;
 
   Future<void> initialize() async {
     if (_isInitialized) return;
     
-    _isar = await Isar.open([AppSettingsSchema], directory: '');
+    _prefs = await SharedPreferences.getInstance();
     _isInitialized = true;
   }
 
   Future<bool> isLabUnlocked() async {
     await _ensureInitialized();
-    
-    final settings = await _isar.appSettings
-        .filter()
-        .keyEqualTo(_labUnlockedKey)
-        .findFirst();
-    
-    return settings?.value == 'true';
+    return _prefs.getBool(_labUnlockedKey) ?? false;
   }
 
   Future<void> setLabUnlocked(bool unlocked) async {
     await _ensureInitialized();
-    
-    final value = unlocked ? 'true' : 'false';
-    final settings = AppSettings(key: _labUnlockedKey, value: value);
-    
-    await _isar.writeTxn(() async {
-      await _isar.appSettings.put(settings);
-    });
+    await _prefs.setBool(_labUnlockedKey, unlocked);
   }
 
   Future<void> _ensureInitialized() async {
@@ -43,9 +30,7 @@ class StorageService {
   }
 
   Future<void> close() async {
-    if (_isInitialized) {
-      await _isar.close();
-      _isInitialized = false;
-    }
+    // SharedPreferences doesn't need explicit closing
+    _isInitialized = false;
   }
 }
