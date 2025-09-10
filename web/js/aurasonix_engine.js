@@ -982,6 +982,25 @@ class AuraSonixEngine {
       filter.frequency.setValueAtTime(filterConfig.frequency, this.audioCtx.currentTime);
       filter.Q.setValueAtTime(filterConfig.Q, this.audioCtx.currentTime);
       
+      // Create LFO (Low Frequency Oscillator) for filter modulation
+      const lfo = this.audioCtx.createOscillator();
+      lfo.type = 'sine';
+      
+      // Get LFO configuration from preset
+      const lfoConfig = this._getLFOConfig(sampleKey, cfg);
+      lfo.frequency.setValueAtTime(lfoConfig.rate, this.audioCtx.currentTime);
+      
+      // Create LFO gain node to control modulation depth
+      const lfoGain = this.audioCtx.createGain();
+      lfoGain.gain.setValueAtTime(lfoConfig.depth, this.audioCtx.currentTime);
+      
+      // Connect LFO -> LFO Gain -> Filter Frequency
+      lfo.connect(lfoGain);
+      lfoGain.connect(filter.frequency);
+      
+      // Start the LFO
+      lfo.start();
+      
       // Connect both oscillators -> filter -> effects chain
       oscillator1.connect(filter);
       oscillator2.connect(filter);
@@ -1018,6 +1037,7 @@ class AuraSonixEngine {
               }
               oscillator1.stop(stopTime + 0.1);
               oscillator2.stop(stopTime + 0.1);
+              lfo.stop(stopTime + 0.1);
             } catch (e) {
               console.warn('AuraSonixEngine: failed to schedule stop for sustain:', e);
             }
@@ -1031,10 +1051,12 @@ class AuraSonixEngine {
       // Performance optimization: Track active sources with better cleanup
       this.activeSources.add(oscillator1);
       this.activeSources.add(oscillator2);
+      this.activeSources.add(lfo);
       // Track by note for precise stop
       if (!this.activeByNote[noteNumber]) this.activeByNote[noteNumber] = new Set();
       this.activeByNote[noteNumber].add(oscillator1);
       this.activeByNote[noteNumber].add(oscillator2);
+      this.activeByNote[noteNumber].add(lfo);
       
       // Handle cleanup when either oscillator ends
       let cleanupCount = 0;
@@ -1045,10 +1067,12 @@ class AuraSonixEngine {
           this._removeVoice(noteNumber);
           this.activeSources.delete(oscillator1);
           this.activeSources.delete(oscillator2);
+          this.activeSources.delete(lfo);
           const set = this.activeByNote[noteNumber];
           if (set) {
             set.delete(oscillator1);
             set.delete(oscillator2);
+            set.delete(lfo);
             if (set.size === 0) delete this.activeByNote[noteNumber];
           }
           // Also remove from any activeByInputNote buckets
@@ -1058,6 +1082,7 @@ class AuraSonixEngine {
               if (s && s.has(oscillator1)) {
                 s.delete(oscillator1);
                 s.delete(oscillator2);
+                s.delete(lfo);
                 if (s.size === 0) delete this.activeByInputNote[key];
               }
             }
@@ -1162,6 +1187,41 @@ class AuraSonixEngine {
 
     // Use layer-based filter configuration
     return layerFilters[sampleKey] || layerFilters.mid;
+  }
+
+  _getLFOConfig(sampleKey, cfg) {
+    // Default LFO configurations for different layers
+    const layerLFOs = {
+      bass: { rate: 0.3, depth: 200 },    // Slow, subtle modulation for bass
+      mid: { rate: 0.5, depth: 300 },     // Medium speed and depth for mid range
+      high: { rate: 0.8, depth: 150 },   // Faster, lighter modulation for high frequencies
+      tex: { rate: 1.2, depth: 400 }     // Fast, deep modulation for texture
+    };
+
+    // Check if preset has custom LFO configuration
+    if (cfg && cfg.audioEffects && cfg.audioEffects.oscillator) {
+      const oscillatorConfig = cfg.audioEffects.oscillator;
+      
+      // Check for layer-specific LFO configuration first
+      if (oscillatorConfig.layers && oscillatorConfig.layers[sampleKey] && oscillatorConfig.layers[sampleKey].lfo) {
+        const layerLFO = oscillatorConfig.layers[sampleKey].lfo;
+        return {
+          rate: layerLFO.rate || layerLFOs[sampleKey].rate,
+          depth: layerLFO.depth || layerLFOs[sampleKey].depth
+        };
+      }
+      
+      // Fall back to global oscillator LFO configuration
+      if (oscillatorConfig.lfo) {
+        return {
+          rate: oscillatorConfig.lfo.rate || layerLFOs[sampleKey].rate,
+          depth: oscillatorConfig.lfo.depth || layerLFOs[sampleKey].depth
+        };
+      }
+    }
+
+    // Use layer-based LFO configuration
+    return layerLFOs[sampleKey] || layerLFOs.mid;
   }
 
   _selectZoneForNote(zones, noteNumber) {

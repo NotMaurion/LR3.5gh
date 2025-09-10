@@ -45,7 +45,7 @@
       "maxNote": 87,
       "baseNote": "C3",
       "volume": 0.50,
-      "probability": 0.,
+      "probability": 0.9,
       "texture": { "enabled": true, "loop": true, "lfoRateHz": 0.20, "lfoDepth": 0.50 }
     }
   ],
@@ -73,30 +73,35 @@
       "detune": 0,
       "harmonicContent": 0.7,
       "filter": { "frequency": 1500, "Q": 0.8 },
+      "lfo": { "rate": 0.8, "depth": 400 },
       "layers": {
         "bass": {
           "type": "sawtooth",
           "detune": -7,
           "harmonicContent": 0.9,
-          "filter": { "frequency": 800, "Q": 0.6 }
+          "filter": { "frequency": 800, "Q": 0.6 },
+          "lfo": { "rate": 0.4, "depth": 250 }
         },
         "mid": {
           "type": "triangle",
           "detune": 0,
           "harmonicContent": 0.7,
-          "filter": { "frequency": 1500, "Q": 0.8 }
+          "filter": { "frequency": 1500, "Q": 0.8 },
+          "lfo": { "rate": 0.8, "depth": 400 }
         },
         "high": {
           "type": "sine",
           "detune": 7,
           "harmonicContent": 0.4,
-          "filter": { "frequency": 2200, "Q": 0.4 }
+          "filter": { "frequency": 2200, "Q": 0.4 },
+          "lfo": { "rate": 1.0, "depth": 200 }
         },
         "tex": {
           "type": "square",
           "detune": 0,
           "harmonicContent": 0.8,
-          "filter": { "frequency": 1800, "Q": 0.9 }
+          "filter": { "frequency": 1800, "Q": 0.9 },
+          "lfo": { "rate": 1.5, "depth": 500 }
         }
       }
     },

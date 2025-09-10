@@ -73,30 +73,35 @@
       "detune": 0,
       "harmonicContent": 0.5,
       "filter": { "frequency": 1000, "Q": 0.6 },
+      "lfo": { "rate": 0.5, "depth": 300 },
       "layers": {
         "bass": {
           "type": "sawtooth",
           "detune": -3,
           "harmonicContent": 0.8,
-          "filter": { "frequency": 600, "Q": 0.4 }
+          "filter": { "frequency": 600, "Q": 0.4 },
+          "lfo": { "rate": 0.3, "depth": 200 }
         },
         "mid": {
           "type": "triangle",
           "detune": 0,
           "harmonicContent": 0.5,
-          "filter": { "frequency": 1000, "Q": 0.6 }
+          "filter": { "frequency": 1000, "Q": 0.6 },
+          "lfo": { "rate": 0.5, "depth": 300 }
         },
         "high": {
           "type": "sine",
           "detune": 3,
           "harmonicContent": 0.3,
-          "filter": { "frequency": 1800, "Q": 0.2 }
+          "filter": { "frequency": 1800, "Q": 0.2 },
+          "lfo": { "rate": 0.8, "depth": 150 }
         },
         "tex": {
           "type": "square",
           "detune": 0,
           "harmonicContent": 0.7,
-          "filter": { "frequency": 1200, "Q": 0.7 }
+          "filter": { "frequency": 1200, "Q": 0.7 },
+          "lfo": { "rate": 1.2, "depth": 400 }
         }
       }
     },

@@ -51,6 +51,8 @@ class PlayerScreen extends ConsumerStatefulWidget {
 class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   bool _initializing = false;
   bool _initialized = false;
+  bool _loadingPreset = false;
+  String? _loadingPresetName;
   Timer? _sleepTimer;
   DateTime? _sleepEndsAt;
 
@@ -78,6 +80,57 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       _initializing = false;
       _initialized = true;
     });
+  }
+
+  Future<void> _loadPresetWithInit(Object engine, String presetName) async {
+    if (_loadingPreset) return; // Prevent multiple simultaneous loads
+    
+    setState(() {
+      _loadingPreset = true;
+      _loadingPresetName = presetName;
+    });
+
+    try {
+      // First ensure the engine is initialized
+      await _ensureInit(engine);
+      
+      // Set active preset immediately for UI feedback
+      ref.read(activePresetProvider.notifier).setActivePreset(presetName);
+      print('Active preset set to: $presetName');
+      
+      // Now load the preset
+      // ignore: avoid_dynamic_calls
+      final ok = await (engine as dynamic).loadPreset(presetName) as bool;
+      if (ok) {
+        print('Preset loaded successfully: $presetName');
+        // Ensure LAB processing is re-applied right after preset load
+        try {
+          final effects = ref.read(audioEffectsProvider).toMap();
+          final scale = ref.read(scaleFilterProvider).toJson();
+          final zones = ref.read(zonesProvider).map((z) => z.toMap()).toList();
+          final midi = ref.read(midiRulesProvider).toMap();
+          (engine as dynamic).updateAudioEffects(effects);
+          (engine as dynamic).updateScaleFilterConfig(scale);
+          (engine as dynamic).updateZonesConfig(zones);
+          (engine as dynamic).updateMidiRules(midi);
+        } catch (_) {}
+      } else {
+        print('Failed to load preset: $presetName');
+        // Reset active preset if loading failed
+        ref.read(activePresetProvider.notifier).clearActivePreset();
+      }
+    } catch (e) {
+      print('Error loading preset $presetName: $e');
+      // Reset active preset if loading failed
+      ref.read(activePresetProvider.notifier).clearActivePreset();
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingPreset = false;
+          _loadingPresetName = null;
+        });
+      }
+    }
   }
 
   void _showTimerSheet() {
@@ -225,15 +278,27 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                 ),
               ),
 
-              if (_initializing)
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: CircularProgressIndicator(),
+              if (_initializing || _loadingPreset)
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      const CircularProgressIndicator(),
+                      if (_loadingPreset && _loadingPresetName != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            'Loading ${_loadingPresetName!.replaceAll('-', ' ')}...',
+                            style: const TextStyle(color: Colors.white70),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               _PresetList(
                 presets: const ['Deep-Focus', 'Creative-Flow', 'Relaxation', 'Night-Drive', 'Meditation', 'Study', 'Workout'],
                 engine: engine,
-                onAnyPress: () => _ensureInit(engine),
+                onPresetPress: _loadPresetWithInit,
               ),
 
               SizedBox(height: size.height * 0.12),
@@ -306,11 +371,11 @@ class _PresetList extends ConsumerStatefulWidget {
   const _PresetList({
     required this.presets, 
     required this.engine, 
-    required this.onAnyPress,
+    required this.onPresetPress,
   });
   final List<String> presets;
   final Object engine;
-  final Future<void> Function() onAnyPress;
+  final Future<void> Function(Object engine, String presetName) onPresetPress;
 
   @override
   ConsumerState<_PresetList> createState() => _PresetListState();
@@ -329,27 +394,7 @@ class _PresetListState extends ConsumerState<_PresetList> {
     // Load the first preset by default
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (widget.presets.isNotEmpty) {
-        await widget.onAnyPress();
-        final ok = await (widget.engine as dynamic).loadPreset(widget.presets.first) as bool;
-        if (ok) {
-          setState(() {
-            _activePreset = widget.presets.first;
-          });
-          // Also set in provider for Lab
-          ref.read(activePresetProvider.notifier).setActivePreset(widget.presets.first);
-          print('Active preset set to: ${widget.presets.first}');
-          // Re-apply LAB state after preset is loaded so it matches LAB immediately
-          try {
-            final effects = ref.read(audioEffectsProvider).toMap();
-            final scale = ref.read(scaleFilterProvider).toJson();
-            final zones = ref.read(zonesProvider).map((z) => z.toMap()).toList();
-            final midi = ref.read(midiRulesProvider).toMap();
-            (widget.engine as dynamic).updateAudioEffects(effects);
-            (widget.engine as dynamic).updateScaleFilterConfig(scale);
-            (widget.engine as dynamic).updateZonesConfig(zones);
-            (widget.engine as dynamic).updateMidiRules(midi);
-          } catch (_) {}
-        }
+        await widget.onPresetPress(widget.engine, widget.presets.first);
       }
     });
   }
@@ -393,29 +438,7 @@ class _PresetListState extends ConsumerState<_PresetList> {
                 return;
               }
               print('Button pressed for preset: $p');
-              await widget.onAnyPress();
-              // Set active preset immediately for UI feedback
-              ref.read(activePresetProvider.notifier).setActivePreset(p);
-              print('Active preset set to: $p');
-              
-              // ignore: avoid_dynamic_calls
-              final ok = await (widget.engine as dynamic).loadPreset(p) as bool;
-              if (ok) {
-                print('Preset loaded successfully: $p');
-                // Ensure LAB processing is re-applied right after preset load
-                try {
-                  final effects = ref.read(audioEffectsProvider).toMap();
-                  final scale = ref.read(scaleFilterProvider).toJson();
-                  final zones = ref.read(zonesProvider).map((z) => z.toMap()).toList();
-                  final midi = ref.read(midiRulesProvider).toMap();
-                  (widget.engine as dynamic).updateAudioEffects(effects);
-                  (widget.engine as dynamic).updateScaleFilterConfig(scale);
-                  (widget.engine as dynamic).updateZonesConfig(zones);
-                  (widget.engine as dynamic).updateMidiRules(midi);
-                } catch (_) {}
-              } else {
-                print('Failed to load preset: $p');
-              }
+              await widget.onPresetPress(widget.engine, p);
             },
           ),
           const SizedBox(height: 12),
