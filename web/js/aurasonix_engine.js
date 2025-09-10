@@ -3,6 +3,10 @@
 class AuraSonixEngine {
   constructor() {
     console.log("AuraSonixEngine: Constructor called - initializing audio engine");
+    
+    // Device detection and performance optimization
+    this._detectDeviceCapabilities();
+    
     this.PRESET_CONFIG = {
       "Creative-Flow": {
         bass: "assets/audio/presets/Creative-Flow/bass.wav",
@@ -61,16 +65,26 @@ class AuraSonixEngine {
     this.activeByNote = {}; // noteNumber -> Set<AudioBufferSourceNode>
     this.activeByInputNote = {}; // original incoming MIDI note -> Set<AudioBufferSourceNode>
     
-    // Performance optimization settings
-    this.MAX_CONCURRENT_NOTES = 16; // Limit concurrent notes to prevent buffer saturation
-    this.MAX_CONCURRENT_NOTES_PER_NOTE = 3; // Max instances of the same note
-    this.NOTE_CLEANUP_INTERVAL = 5000; // Clean up orphaned sources every 5 seconds
+    // Performance optimization settings - more generous limits for better audio quality
+    this.MAX_CONCURRENT_NOTES = Math.max(12, this.deviceCapabilities.maxConcurrentNotes);
+    this.MAX_CONCURRENT_NOTES_PER_NOTE = Math.max(2, this.deviceCapabilities.maxConcurrentNotesPerNote);
+    this.NOTE_CLEANUP_INTERVAL = 5000; // Less frequent cleanup to reduce CPU load
     this._lastCleanupTime = Date.now();
+    
+    // Audio context management for mobile
+    this._audioContextResumeAttempts = 0;
+    this._maxResumeAttempts = 3;
+    this._resumeRetryDelay = 1000;
+    
+    // Buffer management for mobile
+    this._bufferUnderrunProtection = true;
+    this._preloadBuffers = new Map(); // Cache for frequently used buffers
+    this._bufferCacheSize = this.deviceCapabilities.bufferCacheSize;
     
     // Polyphony management
     this.activeVoices = new Map(); // noteNumber -> { source, startTime, velocity, noteName }
     this.voiceCounter = 0; // For unique voice IDs
-    this.polyphonyLimit = 12; // Default polyphony limit
+    this.polyphonyLimit = this.deviceCapabilities.polyphonyLimit;
     this.voiceStealingEnabled = true;
     this.stealOldest = true;
     this.releaseTime = 0.1; // Default release time for voice stealing
@@ -91,10 +105,43 @@ class AuraSonixEngine {
       envelope: { enabled: true, attack: 0.2, decay: 0.3, sustain: 0.8, release: 1.0 },
       sustain: { enabled: true, duration: 3.0, level: 0.9, infinite: false },
       randomness: { enabled: false, pitchVariation: 0.1, velocityVariation: 0.2, timingVariation: 50.0, sustainVariation: 0.3 },
-      simultaneousNotes: { enabled: true, maxNotes: 8, overlapProbability: 0.3, voiceStealing: true, voiceStealThreshold: 0.5 },
-      polyphony: { enabled: true, limit: 12, voiceStealing: true, stealOldest: true, releaseTime: 0.1 },
+      simultaneousNotes: { enabled: true, maxNotes: this.deviceCapabilities.maxSimultaneousNotes, overlapProbability: 0.3, voiceStealing: true, voiceStealThreshold: 0.5 },
+      polyphony: { enabled: true, limit: this.deviceCapabilities.polyphonyLimit, voiceStealing: true, stealOldest: true, releaseTime: 0.1 },
+      oscillator: { 
+        enabled: true, 
+        type: 'sine', 
+        detune: 0, 
+        harmonicContent: 0.5,
+        filter: { frequency: 1200, Q: 0.7 }, // Global filter settings
+        layers: {
+          bass: { 
+            type: 'sawtooth', 
+            detune: -5, 
+            harmonicContent: 0.8,
+            filter: { frequency: 800, Q: 0.5 }
+          },
+          mid: { 
+            type: 'triangle', 
+            detune: 0, 
+            harmonicContent: 0.5,
+            filter: { frequency: 1200, Q: 0.7 }
+          },
+          high: { 
+            type: 'sine', 
+            detune: 5, 
+            harmonicContent: 0.3,
+            filter: { frequency: 2000, Q: 0.3 }
+          },
+          tex: { 
+            type: 'square', 
+            detune: 0, 
+            harmonicContent: 0.7,
+            filter: { frequency: 1500, Q: 0.8 }
+          }
+        }
+      },
       globalVolume: 1.0,
-      audioQuality: 'High'
+      audioQuality: this.deviceCapabilities.audioQuality
     };
     this.currentPresetConfig.midiRules = {
       velocityRule: { enabled: false, minVelocity: 0.0, maxVelocity: 1.0, curve: 'linear' },
@@ -109,7 +156,66 @@ class AuraSonixEngine {
     this._embeddedAudioDataUrls = { bass: null, mid: null, high: null, tex: null };
     
     console.log("AuraSonixEngine: Constructor completed - engine ready");
+    console.log("AuraSonixEngine: Device capabilities:", this.deviceCapabilities);
     console.log("AuraSonixEngine: Available presets:", this.PRESET_KEYS);
+  }
+
+  // Device capability detection for mobile optimization
+  _detectDeviceCapabilities() {
+    const userAgent = navigator.userAgent.toLowerCase();
+    const isMobile = /mobile|android|iphone|ipad|ipod|blackberry|windows phone/i.test(userAgent);
+    const isTablet = /tablet|ipad/i.test(userAgent);
+    const isOldBrowser = /msie|trident/i.test(userAgent) || 
+                        (userAgent.includes('chrome') && parseInt(userAgent.match(/chrome\/(\d+)/)?.[1] || '0') < 60) ||
+                        (userAgent.includes('firefox') && parseInt(userAgent.match(/firefox\/(\d+)/)?.[1] || '0') < 55);
+    
+    // Check for hardware capabilities
+    const hasTouch = 'ontouchstart' in window;
+    const hasAccelerometer = 'DeviceMotionEvent' in window;
+    const memoryInfo = navigator.deviceMemory || 4; // Default to 4GB if not available
+    const hardwareConcurrency = navigator.hardwareConcurrency || 4; // Default to 4 cores
+    
+    // Determine device performance tier
+    let performanceTier = 'high';
+    if (isMobile || isOldBrowser || memoryInfo < 4 || hardwareConcurrency < 4) {
+      performanceTier = 'low';
+    } else if (memoryInfo < 8 || hardwareConcurrency < 8) {
+      performanceTier = 'medium';
+    }
+    
+    // Adjust settings based on performance tier
+    const capabilities = {
+      isMobile,
+      isTablet,
+      isOldBrowser,
+      hasTouch,
+      hasAccelerometer,
+      memoryInfo,
+      hardwareConcurrency,
+      performanceTier,
+      
+      // Audio performance limits - more generous for better audio quality
+      maxConcurrentNotes: performanceTier === 'low' ? 8 : performanceTier === 'medium' ? 12 : 16,
+      maxConcurrentNotesPerNote: performanceTier === 'low' ? 2 : performanceTier === 'medium' ? 2 : 3,
+      maxSimultaneousNotes: performanceTier === 'low' ? 4 : performanceTier === 'medium' ? 6 : 8,
+      polyphonyLimit: performanceTier === 'low' ? 6 : performanceTier === 'medium' ? 10 : 14,
+      
+      // Buffer management
+      bufferCacheSize: performanceTier === 'low' ? 2 : performanceTier === 'medium' ? 4 : 8,
+      audioQuality: performanceTier === 'low' ? 'Low' : performanceTier === 'medium' ? 'Medium' : 'High',
+      
+      // Mobile-specific optimizations
+      useLowLatencyMode: isMobile,
+      enableBufferUnderrunProtection: isMobile || performanceTier === 'low',
+      aggressiveCleanup: isMobile,
+      
+      // Sample rate optimization
+      preferredSampleRate: isMobile ? 22050 : 44100, // Lower sample rate for mobile
+      enableSampleRateConversion: isMobile
+    };
+    
+    this.deviceCapabilities = capabilities;
+    console.log("AuraSonixEngine: Device capabilities detected:", capabilities);
   }
 
   _countAvailableLayers() {
@@ -612,15 +718,26 @@ class AuraSonixEngine {
     return true;
   }
 
-  playNote(noteNumber, velocity = 1.0) {
+  async playNote(noteNumber, velocity = 1.0) {
     console.log("AuraSonixEngine: playNote called", { noteNumber, velocity });
     if (!this.currentPreset) {
       console.warn("AuraSonixEngine: playNote ignored, no preset loaded");
       return;
     }
 
+    // Ensure audio context is running (especially important for mobile)
+    await this._ensureAudioContextRunning();
+
     // Performance optimization: Clean up orphaned sources periodically
     this._cleanupOrphanedSources();
+
+    // Less aggressive buffer management - only check when we're close to limits
+    if (this._isBufferStressed()) {
+      // Only drop notes if we're really at the limit
+      if (this.activeSources.size >= this.MAX_CONCURRENT_NOTES) {
+        this._dropOldestNotes(1);
+      }
+    }
 
     // Polyphony management: Check if we can play this voice
     if (!this._canPlayVoice(noteNumber)) {
@@ -641,8 +758,18 @@ class AuraSonixEngine {
       
       // Check again after stealing
       if (!this._canPlayNote(noteNumber)) {
-        console.warn(`AuraSonixEngine: Cannot play note ${noteNumber}, buffer saturated`);
-        return;
+        // Last resort: force emergency cleanup and try one more time
+        console.warn(`AuraSonixEngine: Buffer still saturated after voice stealing, forcing emergency cleanup`);
+        this._emergencyBufferCleanup();
+        
+        // Wait a tiny bit for cleanup to complete
+        await new Promise(resolve => setTimeout(resolve, 10));
+        
+        // Final check
+        if (!this._canPlayNote(noteNumber)) {
+          console.warn(`AuraSonixEngine: Cannot play note ${noteNumber}, buffer saturated even after emergency cleanup`);
+          return;
+        }
       }
     }
 
@@ -774,13 +901,7 @@ class AuraSonixEngine {
     // For each transformed note, trigger the selected layers
     for (const tNote of finalNoteNumbers) {
       for (const layer of layersToPlay) {
-        let buffer = this.currentBuffers && this.currentBuffers[layer];
-        if (!buffer) {
-          const alt = this._nearestAvailableLayer(layer);
-          buffer = this.currentBuffers && this.currentBuffers[alt];
-          if (!buffer) continue;
-        }
-
+        // For synth engine, we don't need buffers - just create oscillators directly
         // Determine base note per layer or zone
         let baseNoteValue = null;
         if (selectedZone && selectedZone.baseNote && selectedZone.baseNote.length > 1) {
@@ -801,9 +922,9 @@ class AuraSonixEngine {
         const layerGain = baseGain; // could weight per-layer if needed
 
         // Fire and track by original input note to ensure proper stop
-        const src = this._playSingleNote(tNote, finalVelocity, buffer, playbackRate, layerGain, cfg, isTexture, layer);
+        const oscillator = this._playSingleNote(tNote, finalVelocity, null, playbackRate, layerGain, cfg, isTexture, layer);
         if (!this.activeByInputNote[rawInputNote]) this.activeByInputNote[rawInputNote] = new Set();
-        this.activeByInputNote[rawInputNote].add(src);
+        this.activeByInputNote[rawInputNote].add(oscillator);
       }
     }
   }
@@ -851,101 +972,215 @@ class AuraSonixEngine {
   }
 
   _playSingleNote(noteNumber, velocity, buffer, playbackRate, gain, cfg, isTexture = false, sampleKey = null) {
-    const src = this.audioCtx.createBufferSource();
-    src.buffer = buffer;
-    src.playbackRate.value = playbackRate;
-    
-    // Performance optimization: Add creation timestamp for voice stealing
-    src._creationTime = Date.now();
-    src._startTime = this.audioCtx.currentTime;
-    
-    if (isTexture) {
-      src.loop = true;
-    }
-    
-    // Log which buffer is being used
-    console.log("AuraSonixEngine: playing note", {
-      noteNumber,
-      noteName: this._getNoteName(noteNumber),
-      velocity,
-      bufferDuration: buffer.duration,
-      bufferSampleRate: buffer.sampleRate,
-      bufferChannels: buffer.numberOfChannels,
-      playbackRate: playbackRate.toFixed(4),
-      presetName: this.currentPreset,
-      sampleKey: sampleKey || this._getSampleKeyForNote(noteNumber, (cfg && cfg.zones) || [])
-    });
-    
-    // Apply audio effects chain and get the final node
-    const currentEffects = this.currentPresetConfig && this.currentPresetConfig.audioEffects ? this.currentPresetConfig.audioEffects : {};
-    console.log("AuraSonixEngine: applying effects for note", noteNumber, currentEffects);
-    const finalNode = this._createEffectsChain(src, currentEffects, gain, isTexture, noteNumber);
-
-    // LAB parity: do not auto-apply an extra ADSR if disabled. Always add a tail gain for stop control only.
-    const tailGain = this.audioCtx.createGain();
-    tailGain.gain.setValueAtTime(1.0, this.audioCtx.currentTime);
-    finalNode.connect(tailGain);
-    tailGain.connect(this.masterGain);
-    src._gainNode = tailGain;
-    
-    src.start();
-    
-    // Apply sustain settings if enabled
-    if (!isTexture) {
-      if (currentEffects && currentEffects.sustain && currentEffects.sustain.enabled) {
-        const sustain = currentEffects.sustain;
-        if (sustain.infinite) {
-          // Infinite sustain: do not schedule auto-stop
-          console.log('AuraSonixEngine: infinite sustain enabled for note', noteNumber);
-        } else if (sustain.duration > 0) {
-          // Schedule a graceful stop with a short fade
-          const stopTime = this.audioCtx.currentTime + sustain.duration;
-          try {
-            const g = src._gainNode;
-            if (g) {
-              g.gain.setValueAtTime(g.gain.value, stopTime);
-              g.gain.linearRampToValueAtTime(0.0001, stopTime + 0.08);
-            }
-            src.stop(stopTime + 0.1);
-          } catch (e) {
-            console.warn('AuraSonixEngine: failed to schedule stop for sustain:', e);
-          }
-        }
-      }
-    }
-    
-    // Polyphony management: Add voice to active voices tracking
-    this._addVoice(noteNumber, src, velocity);
-    
-    // Performance optimization: Track active sources with better cleanup
-    this.activeSources.add(src);
-    // Track by note for precise stop
-    if (!this.activeByNote[noteNumber]) this.activeByNote[noteNumber] = new Set();
-    this.activeByNote[noteNumber].add(src);
-    
-    src.onended = () => {
-      // Polyphony management: Remove voice from active voices
-      this._removeVoice(noteNumber);
+    try {
+      // Create oscillator instead of buffer source
+      const oscillator = this.audioCtx.createOscillator();
       
-      this.activeSources.delete(src);
-      const set = this.activeByNote[noteNumber];
-      if (set) {
-        set.delete(src);
-        if (set.size === 0) delete this.activeByNote[noteNumber];
+      // Calculate frequency from MIDI note number
+      const frequency = this._midiToFrequency(noteNumber);
+      oscillator.frequency.setValueAtTime(frequency, this.audioCtx.currentTime);
+      
+      // Set oscillator type based on preset or layer
+      const oscillatorType = this._getOscillatorType(sampleKey, cfg);
+      oscillator.type = oscillatorType;
+      
+      // Apply detune if configured
+      const detune = this._getOscillatorDetune(sampleKey, cfg);
+      if (detune !== 0) {
+        oscillator.detune.setValueAtTime(detune, this.audioCtx.currentTime);
       }
-      // Also remove from any activeByInputNote buckets
-      try {
-        for (const key of Object.keys(this.activeByInputNote)) {
-          const s = this.activeByInputNote[key];
-          if (s && s.has(src)) {
-            s.delete(src);
-            if (s.size === 0) delete this.activeByInputNote[key];
+      
+      // Performance optimization: Add creation timestamp for voice stealing
+      oscillator._creationTime = Date.now();
+      oscillator._startTime = this.audioCtx.currentTime;
+      
+      // Start immediately for better timing
+      oscillator.start();
+      
+      // Reduced logging to improve performance - only log occasionally
+      if (Math.random() < 0.05) { // Log only 5% of the time
+        console.log("AuraSonixEngine: playing synth note", {
+          noteNumber,
+          noteName: this._getNoteName(noteNumber),
+          frequency: frequency.toFixed(2),
+          oscillatorType,
+          velocity,
+          presetName: this.currentPreset
+        });
+      }
+      
+      // Create BiquadFilterNode for smoothing the oscillator signal
+      const filter = this.audioCtx.createBiquadFilter();
+      filter.type = 'lowpass';
+      
+      // Configure filter based on layer and preset configuration
+      const filterConfig = this._getFilterConfig(sampleKey, cfg);
+      filter.frequency.setValueAtTime(filterConfig.frequency, this.audioCtx.currentTime);
+      filter.Q.setValueAtTime(filterConfig.Q, this.audioCtx.currentTime);
+      
+      // Connect oscillator -> filter -> effects chain
+      oscillator.connect(filter);
+      
+      // Apply audio effects chain and get the final node
+      const currentEffects = this.currentPresetConfig && this.currentPresetConfig.audioEffects ? this.currentPresetConfig.audioEffects : {};
+      const finalNode = this._createEffectsChain(filter, currentEffects, gain, isTexture, noteNumber);
+
+      // LAB parity: do not auto-apply an extra ADSR if disabled. Always add a tail gain for stop control only.
+      const tailGain = this.audioCtx.createGain();
+      tailGain.gain.setValueAtTime(1.0, this.audioCtx.currentTime);
+      finalNode.connect(tailGain);
+      tailGain.connect(this.masterGain);
+      oscillator._gainNode = tailGain;
+      
+      // Apply sustain settings if enabled
+      if (!isTexture) {
+        if (currentEffects && currentEffects.sustain && currentEffects.sustain.enabled) {
+          const sustain = currentEffects.sustain;
+          if (sustain.infinite) {
+            // Infinite sustain: do not schedule auto-stop
+            console.log('AuraSonixEngine: infinite sustain enabled for note', noteNumber);
+          } else if (sustain.duration > 0) {
+            // Schedule a graceful stop with a short fade
+            const stopTime = this.audioCtx.currentTime + sustain.duration;
+            try {
+              const g = oscillator._gainNode;
+              if (g) {
+                g.gain.setValueAtTime(g.gain.value, stopTime);
+                g.gain.linearRampToValueAtTime(0.0001, stopTime + 0.08);
+              }
+              oscillator.stop(stopTime + 0.1);
+            } catch (e) {
+              console.warn('AuraSonixEngine: failed to schedule stop for sustain:', e);
+            }
           }
         }
-      } catch (_) {}
+      }
+      
+      // Polyphony management: Add voice to active voices tracking
+      this._addVoice(noteNumber, oscillator, velocity);
+      
+      // Performance optimization: Track active sources with better cleanup
+      this.activeSources.add(oscillator);
+      // Track by note for precise stop
+      if (!this.activeByNote[noteNumber]) this.activeByNote[noteNumber] = new Set();
+      this.activeByNote[noteNumber].add(oscillator);
+      
+      oscillator.onended = () => {
+        // Polyphony management: Remove voice from active voices
+        this._removeVoice(noteNumber);
+        
+        this.activeSources.delete(oscillator);
+        const set = this.activeByNote[noteNumber];
+        if (set) {
+          set.delete(oscillator);
+          if (set.size === 0) delete this.activeByNote[noteNumber];
+        }
+        // Also remove from any activeByInputNote buckets
+        try {
+          for (const key of Object.keys(this.activeByInputNote)) {
+            const s = this.activeByInputNote[key];
+            if (s && s.has(oscillator)) {
+              s.delete(oscillator);
+              if (s.size === 0) delete this.activeByInputNote[key];
+            }
+          }
+        } catch (_) {}
+      };
+      
+      return oscillator;
+    } catch (e) {
+      console.error('AuraSonixEngine: Failed to play synth note', noteNumber, ':', e);
+      return null;
+    }
+  }
+
+  // Convert MIDI note number to frequency in Hz
+  _midiToFrequency(noteNumber) {
+    // MIDI note 69 (A4) = 440 Hz
+    // Formula: f = 440 * 2^((n-69)/12)
+    return 440 * Math.pow(2, (noteNumber - 69) / 12);
+  }
+
+  // Get oscillator type based on layer/preset
+  _getOscillatorType(sampleKey, cfg) {
+    // Default oscillator types for different layers
+    const layerTypes = {
+      bass: 'sawtooth',    // Rich harmonics for bass
+      mid: 'triangle',      // Smooth for mid range
+      high: 'sine',        // Pure tone for high frequencies
+      tex: 'square'         // Textural for texture layer
     };
-    
-    return src;
+
+    // Check if preset has custom oscillator configuration
+    if (cfg && cfg.audioEffects && cfg.audioEffects.oscillator) {
+      const oscillatorConfig = cfg.audioEffects.oscillator;
+      
+      // Check for layer-specific configuration first
+      if (oscillatorConfig.layers && oscillatorConfig.layers[sampleKey]) {
+        return oscillatorConfig.layers[sampleKey].type || layerTypes[sampleKey] || 'sine';
+      }
+      
+      // Fall back to global oscillator type
+      return oscillatorConfig.type || layerTypes[sampleKey] || 'sine';
+    }
+
+    // Use layer-based type
+    return layerTypes[sampleKey] || 'sine';
+  }
+
+  // Get oscillator detune based on layer/preset
+  _getOscillatorDetune(sampleKey, cfg) {
+    // Check if preset has custom oscillator configuration
+    if (cfg && cfg.audioEffects && cfg.audioEffects.oscillator) {
+      const oscillatorConfig = cfg.audioEffects.oscillator;
+      
+      // Check for layer-specific configuration first
+      if (oscillatorConfig.layers && oscillatorConfig.layers[sampleKey]) {
+        return oscillatorConfig.layers[sampleKey].detune || 0;
+      }
+      
+      // Fall back to global oscillator detune
+      return oscillatorConfig.detune || 0;
+    }
+
+    // Default no detune
+    return 0;
+  }
+
+  // Get filter configuration based on layer/preset
+  _getFilterConfig(sampleKey, cfg) {
+    // Default filter configurations for different layers
+    const layerFilters = {
+      bass: { frequency: 800, Q: 0.5 },    // Lower cutoff for bass
+      mid: { frequency: 1200, Q: 0.7 },    // Medium cutoff for mid range
+      high: { frequency: 2000, Q: 0.3 },   // Higher cutoff for high frequencies
+      tex: { frequency: 1500, Q: 0.8 }     // Medium-high cutoff for texture
+    };
+
+    // Check if preset has custom filter configuration
+    if (cfg && cfg.audioEffects && cfg.audioEffects.oscillator) {
+      const oscillatorConfig = cfg.audioEffects.oscillator;
+      
+      // Check for layer-specific filter configuration first
+      if (oscillatorConfig.layers && oscillatorConfig.layers[sampleKey] && oscillatorConfig.layers[sampleKey].filter) {
+        const layerFilter = oscillatorConfig.layers[sampleKey].filter;
+        return {
+          frequency: layerFilter.frequency || layerFilters[sampleKey].frequency,
+          Q: layerFilter.Q || layerFilters[sampleKey].Q
+        };
+      }
+      
+      // Fall back to global oscillator filter configuration
+      if (oscillatorConfig.filter) {
+        return {
+          frequency: oscillatorConfig.filter.frequency || layerFilters[sampleKey].frequency,
+          Q: oscillatorConfig.filter.Q || layerFilters[sampleKey].Q
+        };
+      }
+    }
+
+    // Use layer-based filter configuration
+    return layerFilters[sampleKey] || layerFilters.mid;
   }
 
   _selectZoneForNote(zones, noteNumber) {
@@ -1000,19 +1235,19 @@ class AuraSonixEngine {
       }
     } catch (_) {}
     const now = this.audioCtx.currentTime;
-    for (const src of Array.from(set)) {
+    for (const oscillator of Array.from(set)) {
       try {
-        const g = src._gainNode;
+        const g = oscillator._gainNode;
         if (g) {
           g.gain.cancelScheduledValues(now);
           const current = g.gain.value;
           g.gain.setValueAtTime(current, now);
           g.gain.linearRampToValueAtTime(0.0001, now + rel);
         }
-        // Safe stop without relying on deprecated playbackState
-        try { src.stop(now + rel + 0.05); } catch (_) {}
+        // Safe stop for oscillator
+        try { oscillator.stop(now + rel + 0.05); } catch (_) {}
       } catch (e) {
-        console.warn('AuraSonixEngine: error stopping note', noteNumber, ':', e);
+        console.warn('AuraSonixEngine: error stopping synth note', noteNumber, ':', e);
       }
     }
     delete this.activeByNote[noteNumber];
@@ -1024,13 +1259,12 @@ class AuraSonixEngine {
       this.activeVoices.clear();
       this.voiceCounter = 0;
       
-      for (const src of this.activeSources) {
+      for (const oscillator of this.activeSources) {
         try { 
-          if (src.playbackState === 'running' || src.playbackState === 'suspended') {
-            src.stop(); 
-          }
+          // Oscillators don't have playbackState, just stop them directly
+          oscillator.stop(); 
         } catch (e) {
-          console.warn('AuraSonixEngine: error stopping source:', e);
+          console.warn('AuraSonixEngine: error stopping oscillator:', e);
         }
       }
     } finally {
@@ -1123,13 +1357,88 @@ class AuraSonixEngine {
     if (!this.audioCtx) {
       console.log("AuraSonixEngine: Creating new AudioContext");
       const Ctx = window.AudioContext || window.webkitAudioContext;
-      this.audioCtx = new Ctx();
+      
+      // Create AudioContext with device-optimized settings
+      const audioContextOptions = {
+        latencyHint: this.deviceCapabilities.useLowLatencyMode ? 'interactive' : 'balanced',
+        sampleRate: this.deviceCapabilities.preferredSampleRate
+      };
+      
+      try {
+        this.audioCtx = new Ctx(audioContextOptions);
+        console.log("AuraSonixEngine: AudioContext created with options:", audioContextOptions);
+      } catch (e) {
+        console.warn("AuraSonixEngine: Failed to create AudioContext with options, using defaults:", e);
+        this.audioCtx = new Ctx();
+      }
+      
       this.masterGain = this.audioCtx.createGain();
       this.masterGain.gain.value = 1.0;
       this.masterGain.connect(this.audioCtx.destination);
+      
+      // Set up audio context resume handling for mobile
+      this._setupAudioContextResumeHandling();
+      
       console.log("AuraSonixEngine: AudioContext created successfully");
+      console.log("AuraSonixEngine: Sample rate:", this.audioCtx.sampleRate);
+      console.log("AuraSonixEngine: State:", this.audioCtx.state);
     } else {
       console.log("AuraSonixEngine: AudioContext already exists");
+    }
+  }
+
+  // Set up audio context resume handling for mobile devices
+  _setupAudioContextResumeHandling() {
+    if (!this.audioCtx) return;
+    
+    // Handle audio context suspension (common on mobile)
+    this.audioCtx.addEventListener('statechange', () => {
+      console.log("AuraSonixEngine: AudioContext state changed to:", this.audioCtx.state);
+      
+      if (this.audioCtx.state === 'suspended') {
+        console.log("AuraSonixEngine: AudioContext suspended, will attempt resume on next user interaction");
+      }
+    });
+    
+    // Resume audio context on user interaction
+    const resumeOnInteraction = async () => {
+      if (this.audioCtx && this.audioCtx.state === 'suspended') {
+        try {
+          await this.audioCtx.resume();
+          console.log("AuraSonixEngine: AudioContext resumed successfully");
+          this._audioContextResumeAttempts = 0;
+        } catch (e) {
+          console.warn("AuraSonixEngine: Failed to resume AudioContext:", e);
+          this._audioContextResumeAttempts++;
+          
+          if (this._audioContextResumeAttempts < this._maxResumeAttempts) {
+            setTimeout(resumeOnInteraction, this._resumeRetryDelay);
+          }
+        }
+      }
+    };
+    
+    // Add event listeners for user interaction
+    const interactionEvents = ['touchstart', 'touchend', 'mousedown', 'keydown', 'click'];
+    interactionEvents.forEach(eventType => {
+      document.addEventListener(eventType, resumeOnInteraction, { once: true, passive: true });
+    });
+  }
+
+  // Ensure audio context is running before playing
+  async _ensureAudioContextRunning() {
+    if (!this.audioCtx) {
+      await this._ensureAudio();
+    }
+    
+    if (this.audioCtx.state === 'suspended') {
+      try {
+        await this.audioCtx.resume();
+        console.log("AuraSonixEngine: AudioContext resumed for playback");
+      } catch (e) {
+        console.warn("AuraSonixEngine: Failed to resume AudioContext:", e);
+        // Continue anyway, the browser might handle it
+      }
     }
   }
 
@@ -1148,20 +1457,41 @@ class AuraSonixEngine {
         const url = `assets/audio/presets/${presetName}/${filename}`;
         try {
           console.log(`AuraSonixEngine: loading ${key} from ${url}`);
-          buffers[key] = await this._loadAudioBuffer(url);
+          let buffer = await this._loadAudioBuffer(url);
+          
+          // Apply sample rate conversion if needed for mobile
+          if (this.deviceCapabilities.enableSampleRateConversion && buffer.sampleRate !== this.audioCtx.sampleRate) {
+            buffer = this._convertSampleRate(buffer, this.audioCtx.sampleRate);
+          }
+          
+          buffers[key] = buffer;
           console.log(`AuraSonixEngine: successfully loaded ${key}`);
         } catch (error) {
           console.warn(`AuraSonixEngine: failed to load ${key} from ${url}, trying Deep-Focus fallback`, error);
           // Attempt fallback to Deep-Focus assets to avoid bright dummy
           try {
             const altUrl = `assets/audio/presets/Deep-Focus/${filename}`;
-            buffers[key] = await this._loadAudioBuffer(altUrl);
+            let buffer = await this._loadAudioBuffer(altUrl);
+            
+            // Apply sample rate conversion if needed
+            if (this.deviceCapabilities.enableSampleRateConversion && buffer.sampleRate !== this.audioCtx.sampleRate) {
+              buffer = this._convertSampleRate(buffer, this.audioCtx.sampleRate);
+            }
+            
+            buffers[key] = buffer;
             console.log(`AuraSonixEngine: loaded ${key} from fallback ${altUrl}`);
           } catch (e2) {
             // Try lowercase of requested preset directory
             try {
               const lowerUrl = `assets/audio/presets/${presetName.toLowerCase()}/${filename}`;
-              buffers[key] = await this._loadAudioBuffer(lowerUrl);
+              let buffer = await this._loadAudioBuffer(lowerUrl);
+              
+              // Apply sample rate conversion if needed
+              if (this.deviceCapabilities.enableSampleRateConversion && buffer.sampleRate !== this.audioCtx.sampleRate) {
+                buffer = this._convertSampleRate(buffer, this.audioCtx.sampleRate);
+              }
+              
+              buffers[key] = buffer;
               console.log(`AuraSonixEngine: loaded ${key} from lowercase path ${lowerUrl}`);
               continue;
             } catch (e3) {}
@@ -1191,7 +1521,7 @@ class AuraSonixEngine {
 
   _createDummyBuffer(layer) {
     const sampleRate = this.audioCtx.sampleRate;
-    const duration = 1.0; // 1 second
+    const duration = this.deviceCapabilities.isMobile ? 0.5 : 1.0; // Shorter duration for mobile
     const length = sampleRate * duration;
     
     // Create different tones for each layer with distinct frequencies
@@ -1225,10 +1555,45 @@ class AuraSonixEngine {
       frequency: freq,
       amplitude: amplitude,
       duration: duration,
-      sampleRate: sampleRate
+      sampleRate: sampleRate,
+      deviceType: this.deviceCapabilities.performanceTier
     });
     
     return buffer;
+  }
+
+  // Sample rate conversion for mobile devices
+  _convertSampleRate(buffer, targetSampleRate) {
+    if (!this.deviceCapabilities.enableSampleRateConversion || buffer.sampleRate === targetSampleRate) {
+      return buffer;
+    }
+    
+    try {
+      const ratio = targetSampleRate / buffer.sampleRate;
+      const newLength = Math.round(buffer.length * ratio);
+      const newBuffer = this.audioCtx.createBuffer(buffer.numberOfChannels, newLength, targetSampleRate);
+      
+      for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+        const oldData = buffer.getChannelData(channel);
+        const newData = newBuffer.getChannelData(channel);
+        
+        for (let i = 0; i < newLength; i++) {
+          const oldIndex = i / ratio;
+          const oldIndexFloor = Math.floor(oldIndex);
+          const oldIndexCeil = Math.min(oldIndexFloor + 1, oldData.length - 1);
+          const fraction = oldIndex - oldIndexFloor;
+          
+          // Linear interpolation
+          newData[i] = oldData[oldIndexFloor] * (1 - fraction) + oldData[oldIndexCeil] * fraction;
+        }
+      }
+      
+      console.log(`AuraSonixEngine: Converted sample rate from ${buffer.sampleRate} to ${targetSampleRate}`);
+      return newBuffer;
+    } catch (e) {
+      console.warn('AuraSonixEngine: Sample rate conversion failed, using original buffer:', e);
+      return buffer;
+    }
   }
 
   // Get preset-specific modifier to make sounds different
@@ -1291,16 +1656,46 @@ class AuraSonixEngine {
   }
 
   async _loadAudioBuffer(url) {
-    const resp = await fetch(url, { cache: 'no-cache' });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status} for ${url}`);
-    const arr = await resp.arrayBuffer();
-    return await new Promise((resolve, reject) => {
-      try {
-        this.audioCtx.decodeAudioData(arr, resolve, reject);
-      } catch (e) {
-        reject(e);
-      }
-    });
+    try {
+      // Add timeout for mobile devices
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.deviceCapabilities.isMobile ? 10000 : 5000);
+      
+      const resp = await fetch(url, { 
+        cache: 'no-cache',
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!resp.ok) throw new Error(`HTTP ${resp.status} for ${url}`);
+      const arr = await resp.arrayBuffer();
+      
+      return await new Promise((resolve, reject) => {
+        try {
+          // Add timeout for audio decoding
+          const decodeTimeout = setTimeout(() => {
+            reject(new Error('Audio decode timeout'));
+          }, this.deviceCapabilities.isMobile ? 8000 : 4000);
+          
+          this.audioCtx.decodeAudioData(arr, 
+            (buffer) => {
+              clearTimeout(decodeTimeout);
+              resolve(buffer);
+            }, 
+            (error) => {
+              clearTimeout(decodeTimeout);
+              reject(error);
+            }
+          );
+        } catch (e) {
+          reject(e);
+        }
+      });
+    } catch (e) {
+      console.error('AuraSonixEngine: Failed to load audio buffer:', url, e);
+      throw e;
+    }
   }
 
   _notePassesScaleFilter(noteNumber, scaleFilter) {
@@ -1586,22 +1981,15 @@ class AuraSonixEngine {
   }
 
   // Create audio effects chain
-  _createEffectsChain(source, effects, gain, isTexture = false) {
+  _createEffectsChain(source, effects, gain, isTexture = false, noteNumber = 60) {
     let currentNode = source;
-    // Texture LFO (tremolo) before other effects
+    // Texture LFO (tremolo) before other effects - simplified to reduce glitches
     if (isTexture) {
       const tremoloGain = this.audioCtx.createGain();
-      // default values; zones may override via cfg.zones settings
-      let lfoRate = 0.2;
-      let lfoDepth = 0.5;
-      try {
-        const z = (this.currentPresetConfig && Array.isArray(this.currentPresetConfig.zones)) ? this.currentPresetConfig.zones : [];
-        const zone = this._selectZoneForNote(z, noteNumber);
-        if (zone && zone.texture) {
-          lfoRate = Number(zone.texture.lfoRateHz || lfoRate);
-          lfoDepth = Math.max(0, Math.min(1, Number(zone.texture.lfoDepth || lfoDepth)));
-        }
-      } catch (_) {}
+      // Use simpler, more stable LFO settings
+      const lfoRate = 0.1; // Slower LFO to reduce glitches
+      const lfoDepth = 0.3; // Reduced depth for smoother modulation
+      
       const lfo = this.audioCtx.createOscillator();
       lfo.type = 'sine';
       lfo.frequency.setValueAtTime(lfoRate, this.audioCtx.currentTime);
@@ -1740,47 +2128,138 @@ class AuraSonixEngine {
     const totalActiveNotes = this.activeSources.size;
     const notesForThisNote = this.activeByNote[noteNumber] ? this.activeByNote[noteNumber].size : 0;
     
+    // Emergency buffer management - only if we're way over limit
+    if (totalActiveNotes > this.MAX_CONCURRENT_NOTES * 1.5) {
+      console.warn(`AuraSonixEngine: Emergency buffer cleanup - ${totalActiveNotes} voices active, limit is ${this.MAX_CONCURRENT_NOTES}`);
+      this._emergencyBufferCleanup();
+      return false; // Force a retry after cleanup
+    }
+    
     // Check total concurrent notes limit
     if (totalActiveNotes >= this.MAX_CONCURRENT_NOTES) {
-      console.log(`AuraSonixEngine: Max concurrent notes reached (${totalActiveNotes}/${this.MAX_CONCURRENT_NOTES}), will steal voice`);
       return false;
     }
     
     // Check per-note limit
     if (notesForThisNote >= this.MAX_CONCURRENT_NOTES_PER_NOTE) {
-      console.log(`AuraSonixEngine: Max instances for note ${noteNumber} reached (${notesForThisNote}/${this.MAX_CONCURRENT_NOTES_PER_NOTE})`);
       return false;
     }
     
     return true;
   }
 
-  // Performance optimization: Steal oldest voice if needed
-  _stealOldestVoice() {
-    if (this.activeSources.size === 0) return;
+  // Emergency buffer cleanup when we're way over limits
+  _emergencyBufferCleanup() {
+    console.warn('AuraSonixEngine: Performing emergency oscillator cleanup');
     
-    // Find the oldest source by creation time
-    let oldestSource = null;
-    let oldestTime = Date.now();
-    
-    for (const src of this.activeSources) {
-      if (src._creationTime && src._creationTime < oldestTime) {
-        oldestTime = src._creationTime;
-        oldestSource = src;
+    // Stop all oscillators immediately
+    const oscillatorsToStop = Array.from(this.activeSources);
+    for (const oscillator of oscillatorsToStop) {
+      try {
+        oscillator.stop();
+      } catch (e) {
+        console.warn('AuraSonixEngine: Failed to stop oscillator during emergency cleanup:', e);
       }
     }
     
-    if (oldestSource) {
-      console.log('AuraSonixEngine: Stealing oldest voice to prevent buffer saturation');
+    // Clear all tracking
+    this.activeSources.clear();
+    this.activeByNote = {};
+    this.activeByInputNote = {};
+    this.activeVoices.clear();
+    
+    console.warn(`AuraSonixEngine: Emergency cleanup completed - stopped ${oscillatorsToStop.length} oscillators`);
+  }
+
+  // Graceful note dropping - drop oldest notes when buffer is stressed
+  _dropOldestNotes(count = 1) {
+    if (this.activeSources.size === 0) return;
+    
+    // Sort oscillators by creation time
+    const sortedOscillators = Array.from(this.activeSources).sort((a, b) => {
+      return (a._creationTime || 0) - (b._creationTime || 0);
+    });
+    
+    // Drop the oldest oscillators
+    const oscillatorsToDrop = sortedOscillators.slice(0, count);
+    for (const oscillator of oscillatorsToDrop) {
       try {
-        oldestSource.stop();
+        oscillator.stop();
+        this.activeSources.delete(oscillator);
+        
+        // Remove from note tracking
+        for (const [noteNum, sources] of Object.entries(this.activeByNote)) {
+          if (sources.has(oscillator)) {
+            sources.delete(oscillator);
+            if (sources.size === 0) {
+              delete this.activeByNote[noteNum];
+            }
+            break;
+          }
+        }
+        
+        // Remove from input note tracking
+        for (const [inputNote, sources] of Object.entries(this.activeByInputNote)) {
+          if (sources.has(oscillator)) {
+            sources.delete(oscillator);
+            if (sources.size === 0) {
+              delete this.activeByInputNote[inputNote];
+            }
+            break;
+          }
+        }
       } catch (e) {
-        console.warn('AuraSonixEngine: Failed to stop oldest source:', e);
+        console.warn('AuraSonixEngine: Failed to drop oscillator:', e);
       }
     }
   }
 
-  // Performance optimization: Clean up orphaned sources periodically
+  // Performance optimization: Steal oldest voice if needed
+  _stealOldestVoice() {
+    if (this.activeSources.size === 0) return;
+    
+    // Find the oldest oscillator by creation time
+    let oldestOscillator = null;
+    let oldestTime = Date.now();
+    let oldestNoteNumber = null;
+    
+    for (const oscillator of this.activeSources) {
+      if (oscillator._creationTime && oscillator._creationTime < oldestTime) {
+        oldestTime = oscillator._creationTime;
+        oldestOscillator = oscillator;
+        // Find which note this oscillator belongs to
+        for (const [noteNum, sources] of Object.entries(this.activeByNote)) {
+          if (sources.has(oscillator)) {
+            oldestNoteNumber = parseInt(noteNum);
+            break;
+          }
+        }
+      }
+    }
+    
+    if (oldestOscillator) {
+      try {
+        // Stop the oscillator immediately
+        oldestOscillator.stop();
+        
+        // Remove from tracking
+        this.activeSources.delete(oldestOscillator);
+        if (oldestNoteNumber && this.activeByNote[oldestNoteNumber]) {
+          this.activeByNote[oldestNoteNumber].delete(oldestOscillator);
+          if (this.activeByNote[oldestNoteNumber].size === 0) {
+            delete this.activeByNote[oldestNoteNumber];
+          }
+        }
+        
+        // Also remove from polyphony tracking
+        this._removeVoice(oldestNoteNumber);
+      } catch (e) {
+        console.warn('AuraSonixEngine: Failed to stop oldest oscillator:', e);
+      }
+    }
+  }
+
+  // Performance optimization: Clean up orphaned oscillators periodically
   _cleanupOrphanedSources() {
     const now = Date.now();
     if (now - this._lastCleanupTime < this.NOTE_CLEANUP_INTERVAL) return;
@@ -1788,24 +2267,58 @@ class AuraSonixEngine {
     this._lastCleanupTime = now;
     let cleanedCount = 0;
     
-    // Remove sources that have ended but weren't properly cleaned up
-    for (const src of this.activeSources) {
-      if (src.buffer && src.buffer.duration) {
-        const expectedEndTime = src._startTime + (src.buffer.duration / src.playbackRate.value);
-        if (now > expectedEndTime + 1000) { // 1 second grace period
+    // Remove oscillators that have been running too long (oscillators don't have duration like buffers)
+    for (const oscillator of this.activeSources) {
+      if (oscillator._startTime) {
+        const runningTime = now - oscillator._startTime;
+        const maxRunningTime = this.deviceCapabilities.aggressiveCleanup ? 30000 : 60000; // 30s or 60s max
+        if (runningTime > maxRunningTime) {
           try {
-            this.activeSources.delete(src);
+            oscillator.stop();
+            this.activeSources.delete(oscillator);
             cleanedCount++;
           } catch (e) {
-            console.warn('AuraSonixEngine: Failed to cleanup orphaned source:', e);
+            console.warn('AuraSonixEngine: Failed to cleanup orphaned oscillator:', e);
+          }
+        }
+      }
+    }
+    
+    // Less aggressive cleanup to prevent audio glitches
+    if (this.deviceCapabilities.aggressiveCleanup) {
+      // Only force cleanup if we have way too many oscillators
+      if (this.activeSources.size > this.MAX_CONCURRENT_NOTES * 2.0) {
+        const oscillatorsToRemove = Array.from(this.activeSources).slice(0, Math.floor(this.activeSources.size * 0.2));
+        for (const oscillator of oscillatorsToRemove) {
+          try {
+            oscillator.stop();
+            this.activeSources.delete(oscillator);
+            cleanedCount++;
+          } catch (e) {
+            console.warn('AuraSonixEngine: Failed to cleanup oscillator during aggressive cleanup:', e);
           }
         }
       }
     }
     
     if (cleanedCount > 0) {
-      console.log(`AuraSonixEngine: Cleaned up ${cleanedCount} orphaned sources`);
+      console.log(`AuraSonixEngine: Cleaned up ${cleanedCount} orphaned oscillators`);
     }
+  }
+
+  // Preemptive voice stealing to prevent buffer saturation - disabled for better audio quality
+  _preemptiveVoiceStealing() {
+    // Disabled preemptive voice stealing as it was causing audio glitches
+    // Voice stealing will only happen when we actually hit the limit
+    return;
+  }
+
+  // Check if buffer is under stress and should reject new notes
+  _isBufferStressed() {
+    const totalActiveNotes = this.activeSources.size;
+    
+    // Only consider buffer stressed when we're at 90% capacity or higher
+    return totalActiveNotes >= this.MAX_CONCURRENT_NOTES * 0.9;
   }
 
   // Performance monitoring: Get current performance stats
@@ -1915,23 +2428,23 @@ class AuraSonixEngine {
     if (!voice) return;
     
     try {
-      const { source } = voice;
+      const { source: oscillator } = voice;
       
       // Apply release envelope
-      if (source._gainNode) {
-        const currentGain = source._gainNode.gain.value;
+      if (oscillator._gainNode) {
+        const currentGain = oscillator._gainNode.gain.value;
         const releaseStart = this.audioCtx.currentTime;
         const releaseEnd = releaseStart + releaseTime;
         
         // Set up release curve
-        source._gainNode.gain.setValueAtTime(currentGain, releaseStart);
-        source._gainNode.gain.linearRampToValueAtTime(0.001, releaseEnd);
+        oscillator._gainNode.gain.setValueAtTime(currentGain, releaseStart);
+        oscillator._gainNode.gain.linearRampToValueAtTime(0.001, releaseEnd);
         
-        // Stop the source after release
-        source.stop(releaseEnd + 0.01);
+        // Stop the oscillator after release
+        oscillator.stop(releaseEnd + 0.01);
       } else {
         // Fallback: immediate stop
-        source.stop();
+        oscillator.stop();
       }
       
       // Remove from active voices
@@ -1946,12 +2459,12 @@ class AuraSonixEngine {
   }
 
   // Polyphony management: Add voice to active voices
-  _addVoice(noteNumber, source, velocity) {
+  _addVoice(noteNumber, oscillator, velocity) {
     const voiceId = ++this.voiceCounter;
     const noteName = this._getNoteName(noteNumber);
     
     this.activeVoices.set(noteNumber, {
-      source,
+      source: oscillator,
       startTime: Date.now(),
       velocity,
       noteName,

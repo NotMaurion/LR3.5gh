@@ -17,17 +17,17 @@
       "minNote": 21,
       "maxNote": 43,
       "baseNote": "C2",
-      "volume": 0.75,
+      "volume": 0.99,
       "probability": 0.9,
       "texture": { "enabled": true, "loop": true, "lfoRateHz": 0.20, "lfoDepth": 0.50 }
     },
-    {
+    {  
       "name": "Mid",
       "minNote": 44,
       "maxNote": 67,
       "baseNote": "C4",
       "volume": 0.70,
-      "probability": 0.9,
+      "probability": 0.99,
       "texture": { "enabled": true, "loop": true, "lfoRateHz": 0.20, "lfoDepth": 0.50 }
     },
     {
@@ -36,7 +36,7 @@
       "maxNote": 87,
       "baseNote": "C5",
       "volume": 0.60,
-      "probability": 0.9,
+      "probability": 0.99,
       "texture": { "enabled": true, "loop": true, "lfoRateHz": 0.20, "lfoDepth": 0.50 }
     },
     {
@@ -45,7 +45,7 @@
       "maxNote": 87,
       "baseNote": "C3",
       "volume": 0.50,
-      "probability": 0.9,
+      "probability": 0.,
       "texture": { "enabled": true, "loop": true, "lfoRateHz": 0.20, "lfoDepth": 0.50 }
     }
   ],
@@ -60,12 +60,46 @@
   },
 
   "defaultAudioEffects": {
-    "reverb": { "enabled": true, "wet": 0.40, "dry": 0.60, "roomSize": 0.70, "dampening": 0.60, "preDelay": 0.02 },
+    "reverb": { "enabled": true, "wet": 0.55, "dry": 0.45, "roomSize": 0.85, "dampening": 0.70, "preDelay": 0.03 },
     "filter": { "enabled": false, "type": "lpf", "cutoff": 2000.0, "resonance": 0.0 },
-    "envelope": { "enabled": true, "attack": 0.10, "decay": 0.20, "sustain": 0.80, "release": 1.00 },
-    "sustain": { "enabled": true, "duration": 3.00, "level": 0.90, "infinite": false },
-    "randomness": { "enabled": false, "pitchVariation": 0.10, "velocityVariation": 0.20, "timingVariation": 50.0, "sustainVariation": 0.30 },
-    "simultaneousNotes": { "enabled": false, "maxNotes": 8, "overlapProbability": 0.30, "voiceStealing": true, "voiceStealThreshold": 0.50 },
+    "envelope": { "enabled": true, "attack": 0.15, "decay": 0.25, "sustain": 0.75, "release": 0.80 },
+    "sustain": { "enabled": true, "duration": 2.50, "level": 0.85, "infinite": false },
+    "randomness": { "enabled": true, "pitchVariation": 0.05, "velocityVariation": 0.15, "timingVariation": 30.0, "sustainVariation": 0.20 },
+    "simultaneousNotes": { "enabled": true, "maxNotes": 8, "overlapProbability": 0.40, "voiceStealing": true, "voiceStealThreshold": 0.50 },
+    "polyphony": { "enabled": true, "limit": 16, "voiceStealing": true, "stealOldest": true, "releaseTime": 0.08 },
+    "oscillator": {
+      "enabled": true,
+      "type": "triangle",
+      "detune": 0,
+      "harmonicContent": 0.7,
+      "filter": { "frequency": 1500, "Q": 0.8 },
+      "layers": {
+        "bass": {
+          "type": "sawtooth",
+          "detune": -7,
+          "harmonicContent": 0.9,
+          "filter": { "frequency": 800, "Q": 0.6 }
+        },
+        "mid": {
+          "type": "triangle",
+          "detune": 0,
+          "harmonicContent": 0.7,
+          "filter": { "frequency": 1500, "Q": 0.8 }
+        },
+        "high": {
+          "type": "sine",
+          "detune": 7,
+          "harmonicContent": 0.4,
+          "filter": { "frequency": 2200, "Q": 0.4 }
+        },
+        "tex": {
+          "type": "square",
+          "detune": 0,
+          "harmonicContent": 0.8,
+          "filter": { "frequency": 1800, "Q": 0.9 }
+        }
+      }
+    },
     "globalVolume": 1.00,
     "audioQuality": "High",
     "layersEnabled": { "bass": true, "mid": true, "high": true, "tex": true }

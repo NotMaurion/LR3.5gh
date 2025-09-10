@@ -60,12 +60,46 @@
   },
 
   "defaultAudioEffects": {
-    "reverb": { "enabled": true, "wet": 0.40, "dry": 0.60, "roomSize": 0.70, "dampening": 0.60, "preDelay": 0.02 },
+    "reverb": { "enabled": true, "wet": 0.35, "dry": 0.65, "roomSize": 0.60, "dampening": 0.75, "preDelay": 0.01 },
     "filter": { "enabled": false, "type": "lpf", "cutoff": 2000.0, "resonance": 0.0 },
-    "envelope": { "enabled": true, "attack": 0.10, "decay": 0.20, "sustain": 0.80, "release": 1.00 },
-    "sustain": { "enabled": true, "duration": 3.00, "level": 0.90, "infinite": false },
-    "randomness": { "enabled": false, "pitchVariation": 0.10, "velocityVariation": 0.20, "timingVariation": 50.0, "sustainVariation": 0.30 },
-    "simultaneousNotes": { "enabled": false, "maxNotes": 8, "overlapProbability": 0.30, "voiceStealing": true, "voiceStealThreshold": 0.50 },
+    "envelope": { "enabled": true, "attack": 0.08, "decay": 0.15, "sustain": 0.85, "release": 0.60 },
+    "sustain": { "enabled": true, "duration": 2.00, "level": 0.80, "infinite": false },
+    "randomness": { "enabled": false, "pitchVariation": 0.02, "velocityVariation": 0.10, "timingVariation": 20.0, "sustainVariation": 0.15 },
+    "simultaneousNotes": { "enabled": true, "maxNotes": 6, "overlapProbability": 0.25, "voiceStealing": true, "voiceStealThreshold": 0.50 },
+    "polyphony": { "enabled": true, "limit": 8, "voiceStealing": true, "stealOldest": true, "releaseTime": 0.12 },
+    "oscillator": {
+      "enabled": true,
+      "type": "sine",
+      "detune": 0,
+      "harmonicContent": 0.5,
+      "filter": { "frequency": 1000, "Q": 0.6 },
+      "layers": {
+        "bass": {
+          "type": "sawtooth",
+          "detune": -3,
+          "harmonicContent": 0.8,
+          "filter": { "frequency": 600, "Q": 0.4 }
+        },
+        "mid": {
+          "type": "triangle",
+          "detune": 0,
+          "harmonicContent": 0.5,
+          "filter": { "frequency": 1000, "Q": 0.6 }
+        },
+        "high": {
+          "type": "sine",
+          "detune": 3,
+          "harmonicContent": 0.3,
+          "filter": { "frequency": 1800, "Q": 0.2 }
+        },
+        "tex": {
+          "type": "square",
+          "detune": 0,
+          "harmonicContent": 0.7,
+          "filter": { "frequency": 1200, "Q": 0.7 }
+        }
+      }
+    },
     "globalVolume": 1.00,
     "audioQuality": "High",
     "layersEnabled": { "bass": true, "mid": true, "high": true, "tex": true }
