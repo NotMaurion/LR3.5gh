@@ -1,25 +1,10 @@
 import 'package:flutter/material.dart';
-import 'theme/app_theme.dart';
-import 'widgets/styled_preset_button.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'audio/audio_providers.dart';
-import 'ui/lab_screen.dart';
-import 'ui/settings_screen.dart';
-import 'services/storage_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Initialize storage service
-  final storageService = StorageService();
-  await storageService.initialize();
-  
-  runApp(ProviderScope(
-    overrides: [
-      storageServiceProvider.overrideWithValue(storageService),
-    ],
-    child: const LiveRootsApp(),
-  ));
+  runApp(const ProviderScope(child: LiveRootsApp()));
 }
 
 class LiveRootsApp extends StatelessWidget {
@@ -29,7 +14,14 @@ class LiveRootsApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.theme,
+      theme: ThemeData(
+        primarySwatch: Colors.green,
+        scaffoldBackgroundColor: const Color(0xFF0F0F23),
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(color: Colors.white),
+          bodyMedium: TextStyle(color: Colors.white),
+        ),
+      ),
       home: const PlayerScreen(),
     );
   }
@@ -43,174 +35,207 @@ class PlayerScreen extends ConsumerStatefulWidget {
 }
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen> {
-  bool _initializing = false;
-  bool _initialized = false;
+  String? _selectedPreset;
+  bool _isLoading = false;
 
-  Future<void> _ensureInit(Object engine) async {
-    if (_initialized || _initializing) return;
-    setState(() => _initializing = true);
-    await (engine as dynamic).init();
+  final List<String> _presets = [
+    'Creative-Flow',
+    'Deep-Focus', 
+    'Relaxation',
+    'Night-Drive'
+  ];
+
+  Future<void> _selectPreset(String preset) async {
+    if (_isLoading) return;
+    
     setState(() {
-      _initializing = false;
-      _initialized = true;
+      _isLoading = true;
     });
+
+    try {
+      final engine = ref.read(audioEngineProvider);
+      final success = await (engine as dynamic).loadPreset(preset);
+      
+      if (success) {
+        setState(() {
+          _selectedPreset = preset;
+        });
+      }
+    } catch (e) {
+      print('Error loading preset: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    const background = Color(0xFF1A1A2E);
-    const accent = Color(0xFF10D38F);
-    final size = MediaQuery.of(context).size;
-    final engine = ref.watch(audioEngineProvider);
     return Scaffold(
-      backgroundColor: background,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text(''),
-        actions: [
-          if (ref.watch(isLabUnlockedProvider))
-            IconButton(
-              icon: const Icon(Icons.science),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const LabScreen()),
-                );
-              },
-            ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const SettingsScreen()),
-              );
-            },
-          ),
-        ],
-      ),
+      backgroundColor: const Color(0xFF0F0F23),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 40.0),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Logo
-              SizedBox(
-                width: size.width,
-                child: Column(
-                  children: [
-                    Image.asset(
-                      'assets/images/LiveRootsLogo.png',
-                      width: size.width * 0.55,
-                      fit: BoxFit.contain,
-                    ),
-                    const SizedBox(height: 24),
-                  ],
+              // Large central LiveRoots Lab logo
+              Expanded(
+                flex: 3,
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 240,
+                        height: 240,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Color(0xFF10D38F),
+                              Color(0xFF0BA870),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF10D38F).withOpacity(0.4),
+                              blurRadius: 30,
+                              spreadRadius: 8,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'LiveRoots\nLab',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Color(0xFF0B2D24),
+                              fontSize: 36,
+                              fontWeight: FontWeight.bold,
+                              height: 1.1,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 60),
+                    ],
+                  ),
                 ),
               ),
-
-              if (_initializing)
+              
+              // Select Preset title
+              const Text(
+                'Select Preset',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              
+              const SizedBox(height: 32),
+              
+              // Preset list with radio buttons
+              Expanded(
+                flex: 4,
+                child: ListView.builder(
+                  itemCount: _presets.length,
+                  itemBuilder: (context, index) {
+                    final preset = _presets[index];
+                    final isSelected = _selectedPreset == preset;
+                    
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: isSelected 
+                            ? const Color(0xFF10D38F).withOpacity(0.15)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isSelected 
+                              ? const Color(0xFF10D38F)
+                              : Colors.white.withOpacity(0.15),
+                          width: 2,
+                        ),
+                      ),
+                      child: RadioListTile<String>(
+                        value: preset,
+                        groupValue: _selectedPreset,
+                        onChanged: _isLoading ? null : (value) {
+                          if (value != null) {
+                            _selectPreset(value);
+                          }
+                        },
+                        activeColor: const Color(0xFF10D38F),
+                        title: Text(
+                          preset.replaceAll('-', ' '),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        secondary: isSelected
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10D38F),
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF10D38F).withOpacity(0.3),
+                                      blurRadius: 8,
+                                      spreadRadius: 1,
+                                    ),
+                                  ],
+                                ),
+                                child: const Text(
+                                  'ACTIVE',
+                                  style: TextStyle(
+                                    color: Color(0xFF0B2D24),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              )
+                            : null,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              
+              // Loading indicator
+              if (_isLoading)
                 const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: CircularProgressIndicator(),
+                  padding: EdgeInsets.all(20.0),
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF10D38F)),
+                    strokeWidth: 3,
+                  ),
                 ),
-              _PresetList(
-                presets: const ['Creative-Flow', 'Deep-Focus', 'Relaxation', 'Night-Drive'],
-                engine: engine,
-                onAnyPress: () => _ensureInit(engine),
-              ),
-
-              SizedBox(height: size.height * 0.12),
-
-              // Bottom controls (Play enables MIDI listener; Stop stops all)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const _CircleControl(icon: Icons.timer_outlined),
-                  const SizedBox(width: 32),
-                  GestureDetector(
-                    onTap: () async {
-                      await _ensureInit(engine);
-                      await (engine as dynamic).play();
-                    },
-                    child: const _CircleControl(icon: Icons.play_arrow_rounded, primary: true),
-                  ),
-                  const SizedBox(width: 32),
-                  GestureDetector(
-                    onTap: () async {
-                      await _ensureInit(engine);
-                      (engine as dynamic).stopAll();
-                    },
-                    child: const _CircleControl(icon: Icons.stop_rounded),
-                  ),
-                ],
-              ),
+              
+              // Bottom spacing
+              const SizedBox(height: 40),
             ],
           ),
         ),
       ),
-    );
-  }
-}
-
-class _PresetList extends StatefulWidget {
-  const _PresetList({required this.presets, required this.engine, required this.onAnyPress});
-  final List<String> presets;
-  final Object engine;
-  final Future<void> Function() onAnyPress;
-
-  @override
-  State<_PresetList> createState() => _PresetListState();
-}
-
-class _PresetListState extends State<_PresetList> {
-  String? _active;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        for (final p in widget.presets) ...[
-          StyledPresetButton(
-            label: p.replaceAll('-', ' '),
-            isActive: _active == p,
-            onPressed: () async {
-              await widget.onAnyPress();
-              // ignore: avoid_dynamic_calls
-              final ok = await (widget.engine as dynamic).loadPreset(p) as bool;
-              if (ok) setState(() => _active = p);
-            },
-          ),
-          const SizedBox(height: 12),
-        ]
-      ],
-    );
-  }
-}
-
-class _CircleControl extends StatelessWidget {
-  const _CircleControl({required this.icon, this.primary = false});
-  final IconData icon;
-  final bool primary;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = primary ? const Color(0xFF10D38F) : Colors.white24;
-    final iconColor = primary ? const Color(0xFF0B2D24) : Colors.white;
-    return Container(
-      width: 64,
-      height: 64,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: primary ? const Color(0xFF10D38F).withOpacity(0.45) : Colors.black.withOpacity(0.25),
-            blurRadius: 20,
-          ),
-        ],
-      ),
-      child: Icon(icon, size: 32, color: iconColor),
     );
   }
 }

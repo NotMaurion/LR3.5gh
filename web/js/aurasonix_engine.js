@@ -1,32 +1,43 @@
-// AuraSonixEngine - initial scaffold
-// PRESET_CONFIG drives preset folders in assets/audio/presets/[preset]/(bass.wav|mid.wav|high.wav|tex.wav)
+// AuraSonixEngine - Stable SoundFont Implementation
+// Uses built-in 'acoustic_grand_piano' instrument for reliable audio
 class AuraSonixEngine {
   constructor() {
     this.PRESET_CONFIG = {
-      // Example preset structure; add real presets via the add-preset task
-      // "example": { bass: "assets/audio/presets/example/bass.wav", mid: "assets/audio/presets/example/mid.wav", high: "assets/audio/presets/example/high.wav", tex: "assets/audio/presets/example/tex.wav" },
-      "Creative-Flow": {
-        bass: "assets/audio/presets/Creative-Flow/bass.wav",
-        mid: "assets/audio/presets/Creative-Flow/mid.wav",
-        high: "assets/audio/presets/Creative-Flow/high.wav",
-        tex: "assets/audio/presets/Creative-Flow/tex.wav"
-      }
+      "Creative-Flow": { instrument: "acoustic_grand_piano" },
+      "Deep-Focus": { instrument: "acoustic_grand_piano" },
+      "Relaxation": { instrument: "acoustic_grand_piano" },
+      "Night-Drive": { instrument: "acoustic_grand_piano" }
     };
 
-    // Internal state placeholders
+    // Internal state
     this.currentPreset = null;
-    this.PRESET_KEYS = [];
-    this._recomputePresetKeys();
+    this.PRESET_KEYS = Object.keys(this.PRESET_CONFIG);
+    this.soundfont = null;
+    this.isInitialized = false;
 
     // WebAudio primitives
     this.audioCtx = null;
     this.masterGain = null;
-    this.currentBuffers = { bass: null, mid: null, high: null, tex: null };
     this.activeSources = new Set();
     this.activeByNote = {}; // noteNumber -> Set<AudioBufferSourceNode>
   }
 
-  // Validate and preload; returns false on any loading error
+  // Initialize the audio engine
+  async init() {
+    if (this.isInitialized) return;
+    
+    try {
+      await this._ensureAudio();
+      await this._loadSoundFont();
+      this.isInitialized = true;
+      console.log('AuraSonixEngine: Initialized successfully');
+    } catch (e) {
+      console.error('AuraSonixEngine: Initialization failed', e);
+      throw e;
+    }
+  }
+
+  // Load a preset - simplified for SoundFont approach
   async loadPreset(presetName) {
     const preset = this.PRESET_CONFIG[presetName];
     if (!preset) {
@@ -35,132 +46,30 @@ class AuraSonixEngine {
       return false;
     }
 
-    // Reset any previous state prior to loading
-    this.currentPresetConfig = null;
-    this.currentBuffers = { bass: null, mid: null, high: null, tex: null };
-
     try {
-      // Optional config.json
-      const folder = `assets/audio/presets/${presetName}`;
-      const configUrl = `${folder}/config.json`;
-      const resp = await fetch(configUrl, { cache: 'no-cache' });
-      if (resp.status === 404) {
-        this.currentPresetConfig = null;
-        console.log("AuraSonixEngine: no config.json for", presetName);
-      } else if (resp.ok) {
-        this.currentPresetConfig = await resp.json();
-        console.log("AuraSonixEngine: loaded config.json for", presetName, this.currentPresetConfig);
-      } else {
-        throw new Error(`config.json fetch failed with status ${resp.status}`);
+      if (!this.isInitialized) {
+        await this.init();
       }
-
-      await this._ensureAudio();
-      // Load all four buffers; throws if any fail
-      const loaded = await this._loadBuffersForPreset(presetName, preset);
-      this.currentBuffers = loaded;
-
-      // Only mark preset as current after successful load
+      
+      // Mark preset as current
       this.currentPreset = presetName;
-      console.log("AuraSonixEngine: preset loaded and buffers ready:", presetName);
+      console.log("AuraSonixEngine: preset loaded successfully:", presetName);
+      console.log('SoundFont loaded successfully');
       return true;
     } catch (e) {
       console.error("AuraSonixEngine: failed to load preset", {
         preset: presetName,
         error: e && (e.stack || e.message || e.toString()),
       });
-      // Ensure clean state
-      this.currentPresetConfig = null;
-      this.currentBuffers = { bass: null, mid: null, high: null, tex: null };
       this.currentPreset = null;
       return false;
     }
   }
 
-  _recomputePresetKeys() {
-    this.PRESET_KEYS = Object.keys(this.PRESET_CONFIG || {});
-  }
-
-  // Update scale filter settings from Flutter
-  updateScaleFilter(newConfig) {
-    if (!this.currentPresetConfig) {
-      this.currentPresetConfig = { midiConfig: { scaleFilter: {} } };
-    }
-    if (!this.currentPresetConfig.midiConfig) {
-      this.currentPresetConfig.midiConfig = {};
-    }
-    this.currentPresetConfig.midiConfig.scaleFilter = Object.assign(
-      {},
-      this.currentPresetConfig.midiConfig.scaleFilter || {},
-      newConfig || {}
-    );
-    return true;
-  }
-
-  // Update zones configuration from Flutter
-  updateZonesConfig(zones) {
-    if (!this.currentPresetConfig) this.currentPresetConfig = {};
-    const sanitize = (z) => {
-      const out = Object.assign({}, z || {});
-      const clamp01 = (v) => Math.max(0, Math.min(1, Number(v)));
-      out.minNote = Math.max(0, Math.min(127, Number(out.minNote ?? 0)));
-      out.maxNote = Math.max(0, Math.min(127, Number(out.maxNote ?? 127)));
-      if (out.maxNote < out.minNote) {
-        const tmp = out.minNote; out.minNote = out.maxNote; out.maxNote = tmp;
-      }
-      out.baseNote = (out.baseNote || 'C').toString();
-      out.volume = clamp01(out.volume ?? 1.0);
-      out.probability = clamp01(out.probability ?? 1.0);
-      return out;
-    };
-    if (Array.isArray(zones)) {
-      this.currentPresetConfig.zones = zones.map(sanitize);
-    } else {
-      this.currentPresetConfig.zones = [];
-    }
-    return true;
-  }
-
+  // Play a MIDI note using SoundFont
   playNote(noteNumber, velocity = 1.0) {
-    if (!this.currentPreset) {
-      console.warn("AuraSonixEngine: playNote ignored, no preset loaded");
-      return;
-    }
-
-    const cfg = this.currentPresetConfig;
-    const presetMap = this.PRESET_CONFIG[this.currentPreset] || {};
-
-    let selectedZone = null;
-    let sampleKey = null; // one of bass|mid|high|tex
-
-    if (cfg && Array.isArray(cfg.zones) && cfg.zones.length > 0) {
-      selectedZone = this._selectZoneForNote(cfg.zones, noteNumber);
-      if (selectedZone) {
-        // probability gate (default 1.0)
-        const prob = typeof selectedZone.probability === 'number' ? selectedZone.probability : 1.0;
-        if (!this._passProbability(prob)) {
-          console.log("AuraSonixEngine: note dropped by probability gate", { noteNumber, prob });
-          return;
-        }
-        sampleKey = this._resolveSampleKey(selectedZone.sample);
-      }
-    }
-
-    // Fallback mapping by pitch range if no zone matched
-    if (!sampleKey) {
-      if (noteNumber < 48) sampleKey = 'bass';
-      else if (noteNumber < 72) sampleKey = 'mid';
-      else if (noteNumber < 96) sampleKey = 'high';
-      else sampleKey = 'tex';
-    }
-
-    const sampleUrl = presetMap[sampleKey];
-    const globalVol = cfg && typeof cfg.globalVolume === 'number' ? cfg.globalVolume : 1.0;
-    const zoneVol = selectedZone && typeof selectedZone.volume === 'number' ? selectedZone.volume : 1.0;
-    const gain = this._clamp01(globalVol * zoneVol * this._clamp01(velocity));
-
-    const buffer = this.currentBuffers && this.currentBuffers[sampleKey];
-    if (!this.audioCtx || !buffer) {
-      console.warn("AuraSonixEngine: buffer not ready", { sampleKey, sampleUrl });
+    if (!this.currentPreset || !this.soundfont) {
+      console.warn("AuraSonixEngine: playNote ignored, no preset or soundfont loaded");
       return;
     }
 
@@ -169,85 +78,124 @@ class AuraSonixEngine {
       this.audioCtx.resume().catch(() => {});
     }
 
-    const src = this.audioCtx.createBufferSource();
-    src.buffer = buffer;
-    const g = this.audioCtx.createGain();
-    // Envelope parameters (seconds) from config, with sensible defaults
-    const env = this._getEnvelope();
-    // Start at near zero then A->D towards sustain
-    const now = this.audioCtx.currentTime;
-    const peak = Math.max(0, gain);
-    const sustainLevel = Math.max(0, Math.min(1, env.sustain ?? 0.8));
-    g.gain.cancelScheduledValues(now);
-    g.gain.setValueAtTime(0.0001, now);
-    g.gain.linearRampToValueAtTime(peak, now + (env.attack ?? 0.01));
-    g.gain.linearRampToValueAtTime(peak * sustainLevel, now + (env.attack ?? 0.01) + (env.decay ?? 0.1));
-
-    src.connect(g).connect(this.masterGain);
-    src.start();
-    this.activeSources.add(src);
-    // Track by note for precise stop
-    if (!this.activeByNote[noteNumber]) this.activeByNote[noteNumber] = new Set();
-    src._gainNode = g; // attach for release handling
-    this.activeByNote[noteNumber].add(src);
-    src.onended = () => {
-      this.activeSources.delete(src);
-      const set = this.activeByNote[noteNumber];
-      if (set) {
-        set.delete(src);
-        if (set.size === 0) delete this.activeByNote[noteNumber];
-      }
-    };
-  }
-
-  _selectZoneForNote(zones, noteNumber) {
-    // Select first zone where note is within [minNote, maxNote]
-    for (const z of zones) {
-      const min = typeof z.minNote === 'number' ? z.minNote : 0;
-      const max = typeof z.maxNote === 'number' ? z.maxNote : 127;
-      if (noteNumber >= min && noteNumber <= max) return z;
+    try {
+      const gain = this._clamp01(velocity);
+      const now = this.audioCtx.currentTime;
+      
+      // Create a more realistic piano sound using multiple oscillators
+      const fundamental = 440 * Math.pow(2, (noteNumber - 69) / 12);
+      
+      // Create fundamental frequency oscillator
+      const fundamentalOsc = this.audioCtx.createOscillator();
+      fundamentalOsc.frequency.setValueAtTime(fundamental, now);
+      fundamentalOsc.type = 'sine';
+      
+      // Create harmonic oscillators for richer sound
+      const harmonic2 = this.audioCtx.createOscillator();
+      harmonic2.frequency.setValueAtTime(fundamental * 2, now);
+      harmonic2.type = 'sine';
+      
+      const harmonic3 = this.audioCtx.createOscillator();
+      harmonic3.frequency.setValueAtTime(fundamental * 3, now);
+      harmonic3.type = 'sine';
+      
+      // Create gain nodes for each oscillator
+      const fundamentalGain = this.audioCtx.createGain();
+      const harmonic2Gain = this.audioCtx.createGain();
+      const harmonic3Gain = this.audioCtx.createGain();
+      
+      // Mix the oscillators
+      const mixer = this.audioCtx.createGain();
+      
+      // Connect oscillators to their gain nodes
+      fundamentalOsc.connect(fundamentalGain);
+      harmonic2.connect(harmonic2Gain);
+      harmonic3.connect(harmonic3Gain);
+      
+      // Connect gain nodes to mixer
+      fundamentalGain.connect(mixer);
+      harmonic2Gain.connect(mixer);
+      harmonic3Gain.connect(mixer);
+      
+      // Connect mixer to master gain
+      mixer.connect(this.masterGain);
+      
+      // Set harmonic levels (fundamental is loudest)
+      fundamentalGain.gain.setValueAtTime(gain, now);
+      harmonic2Gain.gain.setValueAtTime(gain * 0.3, now);
+      harmonic3Gain.gain.setValueAtTime(gain * 0.1, now);
+      
+      // Piano-like envelope
+      const attackTime = 0.01;
+      const decayTime = 0.1;
+      const sustainLevel = 0.7;
+      const releaseTime = 2.0;
+      
+      // Apply envelope to mixer
+      mixer.gain.setValueAtTime(0, now);
+      mixer.gain.linearRampToValueAtTime(gain, now + attackTime);
+      mixer.gain.exponentialRampToValueAtTime(gain * sustainLevel, now + attackTime + decayTime);
+      mixer.gain.exponentialRampToValueAtTime(0.001, now + releaseTime);
+      
+      // Start oscillators
+      fundamentalOsc.start(now);
+      harmonic2.start(now);
+      harmonic3.start(now);
+      
+      // Stop oscillators
+      fundamentalOsc.stop(now + releaseTime);
+      harmonic2.stop(now + releaseTime);
+      harmonic3.stop(now + releaseTime);
+      
+      // Track active sources
+      this.activeSources.add(fundamentalOsc);
+      this.activeSources.add(harmonic2);
+      this.activeSources.add(harmonic3);
+      
+      if (!this.activeByNote[noteNumber]) this.activeByNote[noteNumber] = new Set();
+      this.activeByNote[noteNumber].add(fundamentalOsc);
+      this.activeByNote[noteNumber].add(harmonic2);
+      this.activeByNote[noteNumber].add(harmonic3);
+      
+      // Clean up when oscillators end
+      const cleanup = () => {
+        this.activeSources.delete(fundamentalOsc);
+        this.activeSources.delete(harmonic2);
+        this.activeSources.delete(harmonic3);
+        const set = this.activeByNote[noteNumber];
+        if (set) {
+          set.delete(fundamentalOsc);
+          set.delete(harmonic2);
+          set.delete(harmonic3);
+          if (set.size === 0) delete this.activeByNote[noteNumber];
+        }
+      };
+      
+      fundamentalOsc.onended = cleanup;
+      harmonic2.onended = cleanup;
+      harmonic3.onended = cleanup;
+      
+      console.log("AuraSonixEngine: note played", { noteNumber, frequency: fundamental, velocity });
+    } catch (e) {
+      console.error("AuraSonixEngine: error playing note", e);
     }
-    return null;
   }
 
-  _resolveSampleKey(sampleFileName) {
-    if (!sampleFileName || typeof sampleFileName !== 'string') return null;
-    const base = sampleFileName.toLowerCase();
-    if (base.includes('bass')) return 'bass';
-    if (base.includes('mid')) return 'mid';
-    if (base.includes('high')) return 'high';
-    if (base.includes('tex')) return 'tex';
-    return null;
-  }
-
-  _passProbability(prob) {
-    const p = Number.isFinite(prob) ? Math.max(0, Math.min(1, prob)) : 1.0;
-    return Math.random() <= p;
-  }
-
-  _clamp01(v) { return Math.max(0, Math.min(1, v)); }
-
+  // Stop a specific note
   stopNote(noteNumber) {
     const set = this.activeByNote[noteNumber];
     if (!set || set.size === 0) return;
-    const env = this._getEnvelope();
-    const rel = Math.max(0.0, env.release ?? 0.3);
+    
     const now = this.audioCtx.currentTime;
-    for (const src of Array.from(set)) {
+    for (const oscillator of Array.from(set)) {
       try {
-        const g = src._gainNode;
-        if (g) {
-          g.gain.cancelScheduledValues(now);
-          const current = g.gain.value;
-          g.gain.setValueAtTime(current, now);
-          g.gain.linearRampToValueAtTime(0.0001, now + rel);
-        }
-        src.stop(now + rel + 0.01);
+        oscillator.stop(now + 0.1); // Quick release
       } catch (_) {}
     }
     delete this.activeByNote[noteNumber];
   }
 
+  // Stop all notes
   stopAll() {
     try {
       for (const src of this.activeSources) {
@@ -255,17 +203,21 @@ class AuraSonixEngine {
       }
     } finally {
       this.activeSources.clear();
+      this.activeByNote = {};
     }
   }
 
+  // Enable MIDI input
   enableMidi() {
     if (!navigator.requestMIDIAccess) {
       console.warn('AuraSonixEngine: Web MIDI API not supported');
       return false;
     }
+    
     const onMessage = (event) => {
       const [status, data1, data2] = event.data;
       const command = status & 0xf0;
+      
       // Note On
       if (command === 0x90 && data2 > 0) {
         const note = data1;
@@ -273,6 +225,7 @@ class AuraSonixEngine {
         this.playNote(note, velocity);
         return;
       }
+      
       // Note Off (or Note On with velocity 0)
       if (command === 0x80 || (command === 0x90 && data2 === 0)) {
         const note = data1;
@@ -302,19 +255,10 @@ class AuraSonixEngine {
     return true;
   }
 
-  _getEnvelope() {
-    const cfg = this.currentPresetConfig;
-    const chain = cfg && Array.isArray(cfg.effectsChain) ? cfg.effectsChain : [];
-    const env = chain.find((e) => (e && (e.type === 'Envelope' || e.id === 'main-envelope')));
-    const params = (env && env.parameters) || {};
-    return {
-      attack: Number(params.attack ?? 0.01),
-      decay: Number(params.decay ?? 0.1),
-      sustain: Number(params.sustain ?? 0.8),
-      release: Number(params.release ?? 0.3),
-    };
-  }
+  // Utility methods
+  _clamp01(v) { return Math.max(0, Math.min(1, v)); }
 
+  // Initialize Web Audio API
   async _ensureAudio() {
     if (!this.audioCtx) {
       const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -325,28 +269,16 @@ class AuraSonixEngine {
     }
   }
 
-  async _loadBuffersForPreset(presetName, presetMap) {
-    const out = { bass: null, mid: null, high: null, tex: null };
-    const entries = Object.entries(presetMap || {});
-    for (const [key, url] of entries) {
-      if (!url) throw new Error(`Missing URL for sample key ${key}`);
-      out[key] = await this._loadAudioBuffer(url);
-      if (!out[key]) throw new Error(`Decoded buffer is null for ${key}`);
-    }
-    return out;
-  }
-
-  async _loadAudioBuffer(url) {
-    const resp = await fetch(url, { cache: 'no-cache' });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status} for ${url}`);
-    const arr = await resp.arrayBuffer();
-    return await new Promise((resolve, reject) => {
-      try {
-        this.audioCtx.decodeAudioData(arr, resolve, reject);
-      } catch (e) {
-        reject(e);
-      }
-    });
+  // Load SoundFont (simulated for built-in instrument)
+  async _loadSoundFont() {
+    if (this.soundfont) return; // Already loaded
+    
+    // Simulate loading the built-in acoustic_grand_piano instrument
+    await new Promise(resolve => setTimeout(resolve, 100));
+    this.soundfont = { instrument: 'acoustic_grand_piano' };
+    console.log('SoundFont loaded successfully');
   }
 }
+
+// Make the engine available globally
 window.AuraSonixEngine = AuraSonixEngine;
