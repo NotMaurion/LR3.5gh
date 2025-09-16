@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Audio Engine Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #0F0F23;
+            color: white;
+            padding: 20px;
+        }
+        .test-button {
+            background-color: #10D38F;
+            color: #0B2D24;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            margin: 10px;
+            cursor: pointer;
+        }
+        .test-button:hover {
+            background-color: #0BA870;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 8px;
+            background-color: #1a1a3a;
+        }
+        .success { background-color: #0d4d3a; }
+        .error { background-color: #4d0d0d; }
+        .info { background-color: #1a1a3a; }
+    </style>
+</head>
+<body>
+    <h1>LiveRoots Audio Engine Test</h1>
+    
+    <div id="status" class="status info">Initializing...</div>
+    
+    <div>
+        <button class="test-button" onclick="testInit()">Initialize Engine</button>
+        <button class="test-button" onclick="testLoadPreset('Creative-Flow')">Load Creative-Flow</button>
+        <button class="test-button" onclick="testLoadPreset('Deep-Focus')">Load Deep-Focus</button>
+        <button class="test-button" onclick="testLoadPreset('Relaxation')">Load Relaxation</button>
+        <button class="test-button" onclick="testPlayNote()">Play Test Note</button>
+        <button class="test-button" onclick="testMidi()">Enable MIDI</button>
+    </div>
+    
+    <div id="log" style="margin-top: 20px; padding: 10px; background-color: #1a1a3a; border-radius: 8px; max-height: 300px; overflow-y: auto;">
+        <h3>Test Log:</h3>
+        <div id="log-content"></div>
+    </div>
+
+    <script src="web/js/aurasonix_engine.js"></script>
+    <script>
+        let engine = null;
+        
+        function log(message, type = 'info') {
+            const logContent = document.getElementById('log-content');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+            logEntry.style.color = type === 'error' ? '#ff6b6b' : type === 'success' ? '#10D38F' : 'white';
+            logContent.appendChild(logEntry);
+            logContent.scrollTop = logContent.scrollHeight;
+        }
+        
+        function updateStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+        
+        async function testInit() {
+            try {
+                log('Initializing audio engine...');
+                engine = new AuraSonixEngine();
+                await engine.init();
+                log('Audio engine initialized successfully!', 'success');
+                updateStatus('Audio Engine Ready', 'success');
+            } catch (error) {
+                log(`Error initializing audio engine: ${error.message}`, 'error');
+                updateStatus('Audio Engine Failed', 'error');
+            }
+        }
+        
+        async function testLoadPreset(presetName) {
+            if (!engine) {
+                log('Please initialize the engine first', 'error');
+                return;
+            }
+            
+            try {
+                log(`Loading preset: ${presetName}...`);
+                const success = await engine.loadPreset(presetName);
+                if (success) {
+                    log(`Preset ${presetName} loaded successfully!`, 'success');
+                    updateStatus(`Preset ${presetName} Active`, 'success');
+                } else {
+                    log(`Failed to load preset: ${presetName}`, 'error');
+                }
+            } catch (error) {
+                log(`Error loading preset ${presetName}: ${error.message}`, 'error');
+            }
+        }
+        
+        function testPlayNote() {
+            if (!engine) {
+                log('Please initialize the engine first', 'error');
+                return;
+            }
+            
+            try {
+                log('Playing test note (Middle C)...');
+                engine.playNote(60, 0.5);
+                log('Test note played successfully!', 'success');
+            } catch (error) {
+                log(`Error playing test note: ${error.message}`, 'error');
+            }
+        }
+        
+        function testMidi() {
+            if (!engine) {
+                log('Please initialize the engine first', 'error');
+                return;
+            }
+            
+            try {
+                const success = engine.enableMidi();
+                if (success) {
+                    log('MIDI input enabled successfully!', 'success');
+                    updateStatus('MIDI Input Enabled', 'success');
+                } else {
+                    log('MIDI input not supported or failed to enable', 'error');
+                }
+            } catch (error) {
+                log(`Error enabling MIDI: ${error.message}`, 'error');
+            }
+        }
+        
+        // Auto-initialize on page load
+        window.addEventListener('load', () => {
+            log('Page loaded, starting auto-initialization...');
+            testInit();
+        });
+    </script>
+</body>
+</html>
