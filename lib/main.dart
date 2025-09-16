@@ -37,6 +37,7 @@ class PlayerScreen extends ConsumerStatefulWidget {
 class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   String? _selectedPreset;
   bool _isLoading = false;
+  bool _audioEngineReady = false;
 
   final List<String> _presets = [
     'Creative-Flow',
@@ -44,6 +45,33 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     'Relaxation',
     'Night-Drive'
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize audio engine on app start
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeAudioEngine();
+    });
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
+  Future<void> _initializeAudioEngine() async {
+    try {
+      final engine = ref.read(audioEngineProvider);
+      await (engine as dynamic).init();
+      setState(() {
+        _audioEngineReady = true;
+      });
+      print('Audio engine initialized successfully');
+    } catch (e) {
+      print('Error initializing audio engine: $e');
+    }
+  }
 
   Future<void> _selectPreset(String preset) async {
     if (_isLoading) return;
@@ -60,6 +88,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         setState(() {
           _selectedPreset = preset;
         });
+        print('Preset loaded successfully: $preset');
+      } else {
+        print('Failed to load preset: $preset');
       }
     } catch (e) {
       print('Error loading preset: $e');
@@ -75,7 +106,25 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F23),
       body: SafeArea(
-        child: Padding(
+        child: Focus(
+          autofocus: true,
+          onKeyEvent: (node, event) {
+            if (event is KeyDownEvent && _selectedPreset != null) {
+              // Test audio with keyboard input
+              if (event.logicalKey.keyLabel == 'Space') {
+                try {
+                  final engine = ref.read(audioEngineProvider);
+                  (engine as dynamic).playNote(60, 0.5); // Play middle C
+                  print('Keyboard test note played: Middle C (note 60)');
+                } catch (e) {
+                  print('Error playing keyboard test note: $e');
+                }
+                return KeyEventResult.handled;
+              }
+            }
+            return KeyEventResult.ignored;
+          },
+          child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 40.0),
           child: Column(
             children: [
@@ -129,14 +178,41 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
               ),
               
               // Select Preset title
-              const Text(
-                'Select Preset',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: -0.5,
-                ),
+              Column(
+                children: [
+                  const Text(
+                    'Select Preset',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 28,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: _audioEngineReady ? const Color(0xFF10D38F) : Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _audioEngineReady ? 'Audio Engine Ready' : 'Initializing Audio...',
+                        style: TextStyle(
+                          color: _audioEngineReady ? const Color(0xFF10D38F) : Colors.red,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
               
               const SizedBox(height: 32),
@@ -230,10 +306,55 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                   ),
                 ),
               
+              // Test audio button (for debugging)
+              if (_selectedPreset != null)
+                Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          try {
+                            final engine = ref.read(audioEngineProvider);
+                            (engine as dynamic).playNote(60, 0.5); // Play middle C
+                            print('Test note played: Middle C (note 60)');
+                          } catch (e) {
+                            print('Error playing test note: $e');
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10D38F),
+                          foregroundColor: const Color(0xFF0B2D24),
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Test Audio',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const Text(
+                      'Press SPACE or click Test Audio to play a note',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ),
+              
               // Bottom spacing
               const SizedBox(height: 40),
             ],
           ),
+        ),
         ),
       ),
     );

@@ -31,6 +31,9 @@ class AuraSonixEngine {
       await this._loadSoundFont();
       this.isInitialized = true;
       console.log('AuraSonixEngine: Initialized successfully');
+      
+      // Enable MIDI input for testing
+      this.enableMidi();
     } catch (e) {
       console.error('AuraSonixEngine: Initialization failed', e);
       throw e;
@@ -54,7 +57,6 @@ class AuraSonixEngine {
       // Mark preset as current
       this.currentPreset = presetName;
       console.log("AuraSonixEngine: preset loaded successfully:", presetName);
-      console.log('SoundFont loaded successfully');
       return true;
     } catch (e) {
       console.error("AuraSonixEngine: failed to load preset", {
@@ -70,6 +72,7 @@ class AuraSonixEngine {
   playNote(noteNumber, velocity = 1.0) {
     if (!this.currentPreset || !this.soundfont) {
       console.warn("AuraSonixEngine: playNote ignored, no preset or soundfont loaded");
+      console.log("Current preset:", this.currentPreset, "Soundfont:", this.soundfont);
       return;
     }
 
@@ -255,6 +258,20 @@ class AuraSonixEngine {
     return true;
   }
 
+  // Test function to verify audio engine is working
+  async testAudio() {
+    try {
+      await this.init();
+      await this.loadPreset('Creative-Flow');
+      this.playNote(60, 0.5); // Play middle C
+      console.log('AuraSonixEngine: Test audio played successfully');
+      return true;
+    } catch (e) {
+      console.error('AuraSonixEngine: Test audio failed', e);
+      return false;
+    }
+  }
+
   // Utility methods
   _clamp01(v) { return Math.max(0, Math.min(1, v)); }
 
@@ -276,7 +293,7 @@ class AuraSonixEngine {
     // Simulate loading the built-in acoustic_grand_piano instrument
     await new Promise(resolve => setTimeout(resolve, 100));
     this.soundfont = { instrument: 'acoustic_grand_piano' };
-    console.log('SoundFont loaded successfully');
+    console.log('AuraSonixEngine: SoundFont loaded successfully');
   }
 }
 
