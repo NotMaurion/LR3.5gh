@@ -106,25 +106,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F23),
       body: SafeArea(
-        child: Focus(
-          autofocus: true,
-          onKeyEvent: (node, event) {
-            if (event is KeyDownEvent && _selectedPreset != null) {
-              // Test audio with keyboard input
-              if (event.logicalKey.keyLabel == 'Space') {
-                try {
-                  final engine = ref.read(audioEngineProvider);
-                  (engine as dynamic).playNote(60, 0.5); // Play middle C
-                  print('Keyboard test note played: Middle C (note 60)');
-                } catch (e) {
-                  print('Error playing keyboard test note: $e');
-                }
-                return KeyEventResult.handled;
-              }
-            }
-            return KeyEventResult.ignored;
-          },
-          child: Padding(
+        child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 40.0),
           child: Column(
             children: [
@@ -340,7 +322,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       ),
                     ),
                     const Text(
-                      'Press SPACE or click Test Audio to play a note',
+                      'Click Test Audio to play a note',
                       style: TextStyle(
                         color: Colors.white70,
                         fontSize: 14,
@@ -354,7 +336,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
               const SizedBox(height: 40),
             ],
           ),
-        ),
         ),
       ),
     );
